@@ -7,21 +7,28 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #include <slash/slash.h>
 
 #include <param/param.h>
 #include <param/param_list.h>
 #include <param/param_client.h>
+#include <vmem/vmem.h>
+#include <vmem/vmem_client.h>
 
-#include "spaceboot_legacy.h"
+#include <csp/csp.h>
+#include <csp/csp_cmp.h>
+#include <csp/arch/csp_thread.h>
+
+#include "spaceboot_bootalt.h"
 
 #define PARAMID_BOOTALT 20
 
 static int bootalt_slash(struct slash *slash)
 {
 	if (slash->argc < 3)
-			return SLASH_EUSAGE;
+		return SLASH_EUSAGE;
 
 	unsigned int node = atoi(slash->argv[1]);
 	unsigned int value = atoi(slash->argv[2]);
@@ -31,24 +38,94 @@ static int bootalt_slash(struct slash *slash)
 		legacy = 1;
 
 	printf("Setting bootalt@%u = %u, legacy = %u\n", node, value, legacy);
-
-	if (legacy) {
-		spaceboot_legacy_bootalt(node, value);
-		return SLASH_SUCCESS;
-	}
-
-	/* Find parameter */
-	param_t * boot_alt = param_list_find_id(node, 20);
-
-	/* Define temporary parameter */
-	if (boot_alt == NULL) {
-		boot_alt = param_list_create_remote(20, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_alt", 8);
-		param_list_add(boot_alt);
-	}
-
-	param_set_uint8(boot_alt, value);
-	param_push_single(boot_alt, 1, node, 100);
+	spaceboot_bootalt(node, value, legacy);
 
 	return SLASH_SUCCESS;
 }
 slash_command(bootalt, bootalt_slash, "<node> <value> [legacy]", "Set boot_alt parameter (pid=20)");
+
+static int bootload_slash(struct slash *slash)
+{
+
+	if (slash->argc < 2)
+		return SLASH_EUSAGE;
+	unsigned int node = atoi(slash->argv[1]);
+
+	unsigned int legacy = 0;
+	if (slash->argc >= 3)
+		legacy = 1;
+
+	struct csp_cmp_message message = {};
+	if (csp_cmp_ident(node, 100, &message) != CSP_ERR_NONE) {
+		printf("Cannot ping system\n");
+		return SLASH_EINVAL;
+	}
+	printf("%s\n%s\n%s\n%s %s\n", message.ident.hostname, message.ident.model, message.ident.revision, message.ident.date, message.ident.time);
+
+	printf("Switching to flash 0\n");
+	spaceboot_bootalt(node, 0, legacy);
+	csp_reboot(node);
+	csp_sleep_ms(1000);
+	printf("Waiting for reboot\n");
+
+	if (csp_cmp_ident(node, 100, &message) != CSP_ERR_NONE) {
+		printf("Cannot ping system\n");
+		return SLASH_EINVAL;
+	}
+	printf("%s\n%s\n%s\n%s %s\n", message.ident.hostname, message.ident.model, message.ident.revision, message.ident.date, message.ident.time);
+
+	printf("Should run from flash 0 now\n");
+
+	char * file = "images/bootloader-e70.bin";
+	unsigned int address = 0x480000;
+	unsigned int timeout = 10000;
+
+	printf("Upload from %s to node %u addr 0x%x\n", file, node, address);
+
+	/* Open file */
+	FILE * fd = fopen(file, "r");
+	if (fd == NULL)
+		return SLASH_EINVAL;
+
+	/* Read size */
+	struct stat file_stat;
+	fstat(fd->_fileno, &file_stat);
+
+	/* Copy to memory */
+	char * data = malloc(file_stat.st_size);
+	int size = fread(data, 1, file_stat.st_size, fd);
+	fclose(fd);
+
+	//csp_hex_dump("file", data, size);
+
+	printf("Size %u\n", size);
+
+	vmem_upload(node, timeout, address, data, size);
+
+
+//satctl ping $1
+//sleep 1
+//
+//echo "Switching to flash0"
+//satctl -r$1 rparam set boot_alt 0
+//satctl csp reboot $1
+//sleep 1
+//satctl csp ident $1
+//
+//echo "Uploading to flash1"
+//satctl upload build/obc.bin $1 0x480000
+//
+//echo "Switch to flash1"
+//satctl -r$1 rparam set boot_alt 10
+//
+//echo "Reboot"
+//satctl csp reboot $1
+//sleep 1
+//
+//satctl ping $1
+//satctl csp ident $1
+
+
+	return SLASH_SUCCESS;
+}
+slash_command(bootload, bootload_slash, "<node> <file> [legacy]", "Upload bootloader to FLASH1");
