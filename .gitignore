@@ -1,0 +1,16 @@
+.settings
+*.bin
+*.elf
+*.hex
+*.lss
+*.o
+*.d
+*.map
+*.sym
+.*project
+.lock*
+.waf-*
+*.swp
+build
+*.cfg
+*.lzo

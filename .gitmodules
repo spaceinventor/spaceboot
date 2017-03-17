@@ -1,0 +1,18 @@
+[submodule "lib/libcsp"]
+	path = lib/csp
+	url = https://github.com/spaceinventor/libcsp
+[submodule "lib/libparam"]
+	path = lib/param
+	url = https://github.com/spaceinventor/libparam
+[submodule "lib/slash"]
+	path = lib/slash
+	url = https://github.com/spaceinventor/slash
+[submodule "lib/si"]
+	path = lib/si
+	url = https://github.com/spaceinventor/libsi
+[submodule "lib/csp"]
+	path = lib/csp
+	url = https://github.com/spaceinventor/libcsp
+[submodule "lib/param"]
+	path = lib/param
+	url = https://github.com/spaceinventor/libparam
