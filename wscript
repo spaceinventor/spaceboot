@@ -27,8 +27,8 @@ def configure(ctx):
     
     ctx.options.slash_csp = True
     
-    ctx.options.param_client = True
-    ctx.options.param_client_slash = True
+    ctx.options.rparam_client = True
+    ctx.options.rparam_client_slash = True
     ctx.options.param_server = True
 
     ctx.options.vmem_client = True

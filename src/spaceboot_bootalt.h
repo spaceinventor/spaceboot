@@ -8,8 +8,6 @@
 #ifndef SRC_SPACEBOOT_BOOTALT_H_
 #define SRC_SPACEBOOT_BOOTALT_H_
 
-
-void spaceboot_bootalt(int node, int value, int legacy);
-
+void spaceboot_bootalt(int node, int value);
 
 #endif /* SRC_SPACEBOOT_BOOTALT_H_ */
