@@ -11,9 +11,6 @@
 
 #include <slash/slash.h>
 
-#include <param/param.h>
-#include <param/param_list.h>
-#include <param/param_client.h>
 #include <vmem/vmem.h>
 #include <vmem/vmem_client.h>
 
@@ -33,16 +30,12 @@ static int bootalt_slash(struct slash *slash)
 	unsigned int node = atoi(slash->argv[1]);
 	unsigned int value = atoi(slash->argv[2]);
 
-	unsigned int legacy = 0;
-	if (slash->argc >= 4)
-		legacy = 1;
-
-	printf("Setting bootalt@%u = %u, legacy = %u\n", node, value, legacy);
-	spaceboot_bootalt(node, value, legacy);
+	printf("Setting bootalt@%u = %u\n", node, value);
+	spaceboot_bootalt(node, value);
 
 	return SLASH_SUCCESS;
 }
-slash_command(bootalt, bootalt_slash, "<node> <value> [legacy]", "Set boot_alt parameter (pid=20)");
+slash_command(bootalt, bootalt_slash, "<node> <value>", "Set boot_alt parameter");
 
 static int bootload_slash(struct slash *slash)
 {
@@ -50,10 +43,6 @@ static int bootload_slash(struct slash *slash)
 	if (slash->argc < 2)
 		return SLASH_EUSAGE;
 	unsigned int node = atoi(slash->argv[1]);
-
-	unsigned int legacy = 0;
-	if (slash->argc >= 3)
-		legacy = 1;
 
 	struct csp_cmp_message message = {};
 	if (csp_cmp_ident(node, 100, &message) != CSP_ERR_NONE) {
@@ -63,7 +52,7 @@ static int bootload_slash(struct slash *slash)
 	printf("%s\n%s\n%s\n%s %s\n", message.ident.hostname, message.ident.model, message.ident.revision, message.ident.date, message.ident.time);
 
 	printf("Switching to flash 0\n");
-	spaceboot_bootalt(node, 0, legacy);
+	spaceboot_bootalt(node, 0);
 	csp_reboot(node);
 	csp_sleep_ms(1000);
 	printf("Waiting for reboot\n");
@@ -128,4 +117,4 @@ static int bootload_slash(struct slash *slash)
 
 	return SLASH_SUCCESS;
 }
-slash_command(bootload, bootload_slash, "<node> <file> [legacy]", "Upload bootloader to FLASH1");
+slash_command(bootload, bootload_slash, "<node> <file>", "Upload bootloader to FLASH1");
