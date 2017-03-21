@@ -53,7 +53,7 @@ static int bootload_slash(struct slash *slash)
 
 	printf("Switching to flash 0\n");
 	spaceboot_bootalt(node, 0);
-	csp_reboot(node);
+	//csp_reboot(node);
 	csp_sleep_ms(1000);
 	printf("Waiting for reboot\n");
 
@@ -64,8 +64,10 @@ static int bootload_slash(struct slash *slash)
 	printf("%s\n%s\n%s\n%s %s\n", message.ident.hostname, message.ident.model, message.ident.revision, message.ident.date, message.ident.time);
 
 	printf("Should run from flash 0 now\n");
+	csp_sleep_ms(1000);
 
 	char * file = "images/bootloader-e70.bin";
+	char * filecheck = "images/bootloader-e70.bin.check";
 	unsigned int address = 0x480000;
 	unsigned int timeout = 10000;
 
@@ -91,29 +93,21 @@ static int bootload_slash(struct slash *slash)
 
 	vmem_upload(node, timeout, address, data, size);
 
+	char * datain = malloc(file_stat.st_size);
+	uint32_t time_begin = csp_get_ms();
+	vmem_download(node, timeout, address, size, datain);
+	uint32_t time_total = csp_get_ms() - time_begin;
 
-//satctl ping $1
-//sleep 1
-//
-//echo "Switching to flash0"
-//satctl -r$1 rparam set boot_alt 0
-//satctl csp reboot $1
-//sleep 1
-//satctl csp ident $1
-//
-//echo "Uploading to flash1"
-//satctl upload build/obc.bin $1 0x480000
-//
-//echo "Switch to flash1"
-//satctl -r$1 rparam set boot_alt 10
-//
-//echo "Reboot"
-//satctl csp reboot $1
-//sleep 1
-//
-//satctl ping $1
-//satctl csp ident $1
+	printf("Downloaded %u bytes in %.03f s at %u Bps\n", size, time_total / 1000.0, (unsigned int) (size / ((float)time_total / 1000.0)) );
 
+	for (int i = 0; i < size; i++) {
+		if (datain[i] == data[i])
+			continue;
+		printf("Diff at %x: %hhx != %hhx\n", 0x480000 + i, data[i], datain[i]);
+	}
+
+	free(data);
+	free(datain);
 
 	return SLASH_SUCCESS;
 }
