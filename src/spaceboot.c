@@ -2,37 +2,48 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-
-#include <slash/slash.h>
+#include <sys/stat.h>
 
 #include <param/param.h>
 #include <param/param_list.h>
 
+#include <vmem/vmem.h>
+#include <vmem/vmem_client.h>
 #include <vmem/vmem_server.h>
 #include <vmem/vmem_ram.h>
 
+
 #include <csp/csp.h>
+#include <csp/csp_cmp.h>
+#include <csp/arch/csp_time.h>
 #include <csp/arch/csp_thread.h>
 #include <csp/interfaces/csp_if_can.h>
 #include <csp/interfaces/csp_if_kiss.h>
 #include <csp/drivers/usart.h>
 #include <csp/drivers/can_socketcan.h>
 
-#define SLASH_PROMPT_GOOD		"\033[96mspaceboot \033[90m%\033[0m "
-#define SLASH_PROMPT_BAD		"\033[96mspaceboot \033[31m!\033[0m "
-#define SLASH_LINE_SIZE			128
-#define SLASH_HISTORY_SIZE		2048
+#include "spaceboot_bootalt.h"
 
 void usage(void)
 {
-	printf("usage: spaceboot [command]\n");
+	printf("Usage: spaceboot [OPTIONS] [COMMANDS] <TARGET>\n");
 	printf("\n");
 	printf("CAN Bootloader\n");
 	printf("Copyright (c) 2017 Space Inventor <info@satlab.com>\n");
 	printf("\n");
-	printf("Options:\n");
-	printf(" -i INTERFACE,\tUse INTERFACE as CAN interface\n");
-	printf(" -n NODE\tUse NODE as own CSP address\n");
+	printf(" Options:\n\n");
+	printf("  -i INTERFACE\t\tUse INTERFACE as CAN interface\n");
+	printf("  -n NODE\t\tUse NODE as own CSP address\n");
+	printf("  -h \t\t\tShow help\n");
+	printf("\n");
+	printf("Commands (executed in order):\n\n");
+	printf("  -r \t\t\tReset to flash0\n");
+	printf("  -b [filename]\t\tUpload bootloader to flash slot 1\n");
+	printf("  -f <filename>\t\tUpload file to flash slot 0\n");
+	printf("\n");
+	printf("Arguments:\n\n");
+	printf(" <target>\t\tCSP node to upload to\n");
+	printf("\n");
 }
 
 int configure_csp(uint8_t addr, char *ifc)
@@ -64,16 +75,53 @@ int configure_csp(uint8_t addr, char *ifc)
 	return 0;
 }
 
+static void ping(int node) {
+
+	struct csp_cmp_message message = {};
+	if (csp_cmp_ident(node, 100, &message) != CSP_ERR_NONE) {
+		printf("Cannot ping system\n");
+		exit(EXIT_FAILURE);
+	}
+	printf("  | %s\n  | %s\n  | %s\n  | %s %s\n", message.ident.hostname, message.ident.model, message.ident.revision, message.ident.date, message.ident.time);
+
+}
+
+static void reset_to_flash(int node, int flash) {
+	printf("  Switching to flash %u\n", flash);
+	if (flash)
+		spaceboot_bootalt(node, 1);
+	else
+		spaceboot_bootalt(node, 0);
+
+	printf("  Rebooting");
+	csp_reboot(node);
+	int step = 100;
+	int ms = 1000;
+	while(ms > 0) {
+		printf(".");
+		fflush(stdout);
+		csp_sleep_ms(step);
+		ms -= step;
+	}
+	printf("\n");
+
+	ping(node);
+
+}
+
 int main(int argc, char **argv)
 {
-	struct slash *slash;
-	int remain, index, i, c, p = 0;
-	char *ex;
-
+	/* Parsed values */
 	uint8_t addr = 31;
 	char *ifc = "can0";
+	int reset = 0;
+	int counter = 0;
+	char file[100] = {};
+	char bootimg[100] = {};
 
-	while ((c = getopt(argc, argv, "+hr:i:n:")) != -1) {
+	/* Run parser */
+	int remain, index, c;
+	while ((c = getopt(argc, argv, "+hri:n:c:f:b::")) != -1) {
 		switch (c) {
 		case 'h':
 			usage();
@@ -84,49 +132,105 @@ int main(int argc, char **argv)
 		case 'n':
 			addr = atoi(optarg);
 			break;
+		case 'r':
+			reset = 1;
+			break;
+		case 'c':
+			counter = atoi(optarg);
+			break;
+		case 'f':
+			strncpy(file, optarg, 100);
+			break;
+		case 'b':
+			if (optarg)
+				strncpy(bootimg, optarg, 100);
+			else
+				strcat(bootimg, "images/bootloader-e70.bin");
+			break;
 		default:
 			exit(EXIT_FAILURE);
 		}
 	}
-
 	remain = argc - optind;
 	index = optind;
+
+	if (remain != 1) {
+		usage();
+		exit(EXIT_SUCCESS);
+	}
+
+	/* Parse remaining options */
+	uint8_t node = atoi(argv[index]);
 
 	if (configure_csp(addr, ifc) < 0) {
 		fprintf(stderr, "Failed to init CSP\n");
 		exit(EXIT_FAILURE);
 	}
 
-	slash = slash_create(SLASH_LINE_SIZE, SLASH_HISTORY_SIZE);
-	if (!slash) {
-		fprintf(stderr, "Failed to init slash\n");
-		exit(EXIT_FAILURE);
+	/**
+	 * STEP 0: Contact system
+	 */
+	printf("\nPING\n");
+	printf("----\n");
+
+	ping(node);
+
+	/**
+	 * STEP 1: Reset system
+	 */
+	if (reset) {
+		reset_to_flash(node, 0);
 	}
 
-	/* Interactive or one-shot mode */
-	if (remain > 0) {
-		ex = malloc(SLASH_LINE_SIZE);
-		if (!ex) {
-			fprintf(stderr, "Failed to allocate command memory");
+	/**
+	 * STEP 2: Upload to flash1
+	 */
+	if (strlen(bootimg)) {
+
+		printf("\nBOOTLOADER\n");
+		printf("----------\n");
+
+		unsigned int address = 0x480000;
+		unsigned int timeout = 10000;
+
+		/* Open file */
+		FILE * fd = fopen(bootimg, "r");
+		if (fd == NULL) {
+			printf("  Cannot find bootimage: %s\n", bootimg);
 			exit(EXIT_FAILURE);
 		}
 
-		/* Build command string */
-		for (i = 0; i < remain; i++) {
-			if (i > 0)
-				p = ex - strncat(ex, " ", SLASH_LINE_SIZE - p);
-			p = ex - strncat(ex, argv[index + i], SLASH_LINE_SIZE - p);
-		}
-		slash_execute(slash, ex);
-		free(ex);
-	} else {
-		printf("SpaceBoot - CAN Bootloader\n");
-		printf("Copyright (c) 2017 Space Inventor ApS <info@satlab.com>\n\n");
+		/* Read size */
+		struct stat file_stat;
+		fstat(fd->_fileno, &file_stat);
 
-		slash_loop(slash, SLASH_PROMPT_GOOD, SLASH_PROMPT_BAD);
+		/* Copy to memory */
+		char * data = malloc(file_stat.st_size);
+		int size = fread(data, 1, file_stat.st_size, fd);
+		fclose(fd);
+
+		printf("  Upload %u bytes from %s to node %u addr 0x%x\n", size, bootimg, node, address);
+
+		vmem_upload(node, timeout, address, data, size);
+
+		char * datain = malloc(file_stat.st_size);
+
+		vmem_download(node, timeout, address, size, datain);
+
+		for (int i = 0; i < size; i++) {
+			if (datain[i] == data[i])
+				continue;
+			printf("Diff at %x: %hhx != %hhx\n", 0x480000 + i, data[i], datain[i]);
+			exit(EXIT_FAILURE);
+		}
+
+		free(data);
+		free(datain);
+
+		reset_to_flash(node, 1);
+
 	}
 
-	slash_destroy(slash);
 
 	return 0;
 }
