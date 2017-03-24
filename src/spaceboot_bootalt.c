@@ -32,4 +32,5 @@ void spaceboot_bootalt(int node, int value)
 	} else {
 		printf("legacy response: %2s\n", in);
 	}
+
 }
