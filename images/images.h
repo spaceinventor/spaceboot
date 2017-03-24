@@ -3,14 +3,14 @@
 
 #include "incbin.h"
 
-INCBIN_EXTERN(e70_2);
+INCBIN_EXTERN(e70);
 
 static const struct {
 	char * name;
 	const unsigned char * data;
 	const unsigned int * len;
 } images[] = {
-	{"e70_2", ge70_2Data, &ge70_2Size},
+	{"e70", ge70Data, &ge70Size},
 	{}, //! Sentinel value
 };
 

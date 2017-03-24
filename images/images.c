@@ -1,4 +1,4 @@
 #include "images.h"
 
-INCBIN(e70_2, IMAGEDIR "/e70_2.bin");
+INCBIN(e70, IMAGEDIR "/e70.bin");
 
