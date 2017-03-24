@@ -23,6 +23,7 @@
 #include <csp/drivers/can_socketcan.h>
 
 #include "../images/images.h"
+#include "products.h"
 #include "spaceboot_bootalt.h"
 
 static void usage(void)
@@ -37,6 +38,7 @@ static void usage(void)
 	printf("  -n NODE\t\tUse NODE as own CSP address\n");
 	printf("  -h \t\t\tShow help\n");
 	printf("  -l \t\t\tList embedded images\n");
+	printf("  -p PRODUCT\t\t[e70, pdu, mppt, dise]");
 	printf("\n");
 	printf(" Commands (executed in order):\n\n");
 	printf("  -r \t\t\tReset to flash0\n");
@@ -188,10 +190,11 @@ int main(int argc, char **argv)
 	int reset = 0;
 	char file[100] = {};
 	char bootimg[100] = {};
+	int productid = 0;
 
 	/* Run parser */
 	int remain, index, c;
-	while ((c = getopt(argc, argv, "+hri:n:f:b::l")) != -1) {
+	while ((c = getopt(argc, argv, "+hri:n:f:b::lp:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage();
@@ -212,11 +215,24 @@ int main(int argc, char **argv)
 			strncpy(file, optarg, 100);
 			break;
 		case 'b':
-			printf("We have b %s\n", optarg);
 			if (optarg)
 				strncpy(bootimg, optarg, 100);
 			else
-				strcat(bootimg, "e70_2");
+				strcat(bootimg, products[productid].image);
+			break;
+		case 'p':
+			if (strcmp(optarg, "e70") == 0) {
+				productid = 0;
+			} else if (strcmp(optarg, "pdu") == 0) {
+				productid = 1;
+			} else if (strcmp(optarg, "mppt") == 0) {
+				productid = 2;
+			} else if (strcmp(optarg, "dise") == 0) {
+				productid = 3;
+			} else {
+				printf("Invalid product selected, choose either [e70, pdu, mppt, dise]\n");
+				exit(EXIT_FAILURE);
+			}
 			break;
 		default:
 			exit(EXIT_FAILURE);
@@ -227,7 +243,7 @@ int main(int argc, char **argv)
 
 	if (remain != 1) {
 		usage();
-		exit(EXIT_SUCCESS);
+		exit(EXIT_FAILURE);
 	}
 
 	/* Parse remaining options */
@@ -261,7 +277,7 @@ int main(int argc, char **argv)
 		char * data;
 		int len;
 		image_get(bootimg, &data, &len);
-		upload_and_verify(node, 0x480000, data, len);
+		upload_and_verify(node, products[productid].flash1_addr, data, len);
 		reset_to_flash(node, 1);
 	}
 
@@ -274,7 +290,7 @@ int main(int argc, char **argv)
 		char * data;
 		int len;
 		image_get(file, &data, &len);
-		upload_and_verify(node, 0x400000, data, len);
+		upload_and_verify(node, products[productid].flash0_addr, data, len);
 		reset_to_flash(node, 0);
 	}
 
