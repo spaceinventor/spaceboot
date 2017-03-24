@@ -1,5 +1,5 @@
-spaceboot
-##########
+Spaceboot
+=========
 
 CAN Bootloader for Space Inventor products.
 
