@@ -22,9 +22,10 @@
 #include <csp/drivers/usart.h>
 #include <csp/drivers/can_socketcan.h>
 
+#include "../images/images.h"
 #include "spaceboot_bootalt.h"
 
-void usage(void)
+static void usage(void)
 {
 	printf("Usage: spaceboot [OPTIONS] [COMMANDS] <TARGET>\n");
 	printf("\n");
@@ -35,18 +36,33 @@ void usage(void)
 	printf("  -i INTERFACE\t\tUse INTERFACE as CAN interface\n");
 	printf("  -n NODE\t\tUse NODE as own CSP address\n");
 	printf("  -h \t\t\tShow help\n");
+	printf("  -l \t\t\tList embedded images\n");
 	printf("\n");
-	printf("Commands (executed in order):\n\n");
+	printf(" Commands (executed in order):\n\n");
 	printf("  -r \t\t\tReset to flash0\n");
 	printf("  -b [filename]\t\tUpload bootloader to flash slot 1\n");
 	printf("  -f <filename>\t\tUpload file to flash slot 0\n");
 	printf("\n");
-	printf("Arguments:\n\n");
+	printf(" Arguments:\n\n");
 	printf(" <target>\t\tCSP node to upload to\n");
 	printf("\n");
 }
 
-int configure_csp(uint8_t addr, char *ifc)
+static void print_images(void) {
+
+	printf("\n");
+	printf("CAN Bootloader\n");
+	printf("Copyright (c) 2017 Space Inventor <info@satlab.com>\n");
+	printf("\n");
+	printf(" Images:\n");
+	for (int i = 0; images[i].name != NULL; i++) {
+		printf("  %s\n", images[i].name);
+	}
+	printf("\n");
+
+}
+
+static int configure_csp(uint8_t addr, char *ifc)
 {
 
 	if (csp_buffer_init(100, 320) < 0)
@@ -109,22 +125,79 @@ static void reset_to_flash(int node, int flash) {
 
 }
 
+static void image_get(char * filename, char ** data, int * len) {
+
+	/* Check for embedded image */
+	for (int i = 0; images[i].name != NULL; i++) {
+		if (strcmp(filename, images[i].name) == 0) {
+			*data = (char *) images[i].data;
+			*len = *images[i].len;
+			printf("  Using embedded image: %s\n", filename);
+			return;
+		}
+	}
+
+	/* Open file */
+	FILE * fd = fopen(filename, "r");
+	if (fd == NULL) {
+		printf("  Cannot find file: %s\n", filename);
+		exit(EXIT_FAILURE);
+	}
+
+	/* Read size */
+	struct stat file_stat;
+	fstat(fd->_fileno, &file_stat);
+
+	printf("  Open %s size %zu\n", filename, file_stat.st_size);
+
+	/* Copy to memory:
+	 * Note we ignore the memory leak because the application will terminate immediately after using the data */
+	*data = malloc(file_stat.st_size);
+	*len = fread(*data, 1, file_stat.st_size, fd);
+	fclose(fd);
+
+}
+
+static void upload_and_verify(int node, int address, char * data, int len) {
+
+	unsigned int timeout = 10000;
+
+	printf("  Upload %u bytes to node %u addr 0x%x\n", len, node, address);
+
+	vmem_upload(node, timeout, address, data, len);
+
+	char * datain = malloc(len);
+
+	vmem_download(node, timeout, address, len, datain);
+
+	for (int i = 0; i < len; i++) {
+		if (datain[i] == data[i])
+			continue;
+		printf("Diff at %x: %hhx != %hhx\n", 0x480000 + i, data[i], datain[i]);
+		exit(EXIT_FAILURE);
+	}
+
+	free(datain);
+}
+
 int main(int argc, char **argv)
 {
 	/* Parsed values */
 	uint8_t addr = 31;
 	char *ifc = "can0";
 	int reset = 0;
-	int counter = 0;
 	char file[100] = {};
 	char bootimg[100] = {};
 
 	/* Run parser */
 	int remain, index, c;
-	while ((c = getopt(argc, argv, "+hri:n:c:f:b::")) != -1) {
+	while ((c = getopt(argc, argv, "+hri:n:f:b::l")) != -1) {
 		switch (c) {
 		case 'h':
 			usage();
+			exit(EXIT_SUCCESS);
+		case 'l':
+			print_images();
 			exit(EXIT_SUCCESS);
 		case 'i':
 			ifc = optarg;
@@ -135,17 +208,15 @@ int main(int argc, char **argv)
 		case 'r':
 			reset = 1;
 			break;
-		case 'c':
-			counter = atoi(optarg);
-			break;
 		case 'f':
 			strncpy(file, optarg, 100);
 			break;
 		case 'b':
+			printf("We have b %s\n", optarg);
 			if (optarg)
 				strncpy(bootimg, optarg, 100);
 			else
-				strcat(bootimg, "images/bootloader-e70.bin");
+				strcat(bootimg, "e70_2");
 			break;
 		default:
 			exit(EXIT_FAILURE);
@@ -172,7 +243,6 @@ int main(int argc, char **argv)
 	 */
 	printf("\nPING\n");
 	printf("----\n");
-
 	ping(node);
 
 	/**
@@ -186,51 +256,27 @@ int main(int argc, char **argv)
 	 * STEP 2: Upload to flash1
 	 */
 	if (strlen(bootimg)) {
-
 		printf("\nBOOTLOADER\n");
 		printf("----------\n");
-
-		unsigned int address = 0x480000;
-		unsigned int timeout = 10000;
-
-		/* Open file */
-		FILE * fd = fopen(bootimg, "r");
-		if (fd == NULL) {
-			printf("  Cannot find bootimage: %s\n", bootimg);
-			exit(EXIT_FAILURE);
-		}
-
-		/* Read size */
-		struct stat file_stat;
-		fstat(fd->_fileno, &file_stat);
-
-		/* Copy to memory */
-		char * data = malloc(file_stat.st_size);
-		int size = fread(data, 1, file_stat.st_size, fd);
-		fclose(fd);
-
-		printf("  Upload %u bytes from %s to node %u addr 0x%x\n", size, bootimg, node, address);
-
-		vmem_upload(node, timeout, address, data, size);
-
-		char * datain = malloc(file_stat.st_size);
-
-		vmem_download(node, timeout, address, size, datain);
-
-		for (int i = 0; i < size; i++) {
-			if (datain[i] == data[i])
-				continue;
-			printf("Diff at %x: %hhx != %hhx\n", 0x480000 + i, data[i], datain[i]);
-			exit(EXIT_FAILURE);
-		}
-
-		free(data);
-		free(datain);
-
+		char * data;
+		int len;
+		image_get(bootimg, &data, &len);
+		upload_and_verify(node, 0x480000, data, len);
 		reset_to_flash(node, 1);
-
 	}
 
+	/**
+	 * STEP 3: Upload to flash0
+	 */
+	if (strlen(file)) {
+		printf("\nFLASHING\n");
+		printf("----------\n");
+		char * data;
+		int len;
+		image_get(file, &data, &len);
+		upload_and_verify(node, 0x400000, data, len);
+		reset_to_flash(node, 0);
+	}
 
 	return 0;
 }
