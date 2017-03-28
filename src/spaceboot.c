@@ -41,7 +41,7 @@ static void usage(void)
 	printf("  -p PRODUCT\t\t[e70, pdu, mppt, dise]");
 	printf("\n");
 	printf(" Commands (executed in order):\n\n");
-	printf("  -r \t\t\tReset to flash0\n");
+	printf("  -r [x]\t\tReset to flash <x>\n");
 	printf("  -b [filename]\t\tUpload bootloader to flash slot 1\n");
 	printf("  -f <filename>\t\tUpload file to flash slot 0\n");
 	printf("\n");
@@ -188,13 +188,15 @@ int main(int argc, char **argv)
 	uint8_t addr = 31;
 	char *ifc = "can0";
 	int reset = 0;
+	int reset_flash = 0;
 	char file[100] = {};
 	char bootimg[100] = {};
 	int productid = 0;
 
+
 	/* Run parser */
 	int remain, index, c;
-	while ((c = getopt(argc, argv, "+hri:n:f:b::lp:")) != -1) {
+	while ((c = getopt(argc, argv, "+hr::i:n:f:b::lp:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage();
@@ -210,6 +212,8 @@ int main(int argc, char **argv)
 			break;
 		case 'r':
 			reset = 1;
+			if (optarg)
+				reset_flash = atoi(optarg);
 			break;
 		case 'f':
 			strncpy(file, optarg, 100);
@@ -265,7 +269,7 @@ int main(int argc, char **argv)
 	 * STEP 1: Reset system
 	 */
 	if (reset) {
-		reset_to_flash(node, 0);
+		reset_to_flash(node, reset_flash);
 	}
 
 	/**
