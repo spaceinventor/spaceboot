@@ -6,6 +6,7 @@
 
 #include <param/param.h>
 #include <param/param_list.h>
+#include <param/param_client.h>
 
 #include <vmem/vmem.h>
 #include <vmem/vmem_client.h>
@@ -24,7 +25,8 @@
 
 #include "../images/images.h"
 #include "products.h"
-#include "spaceboot_bootalt.h"
+
+param_t * boot_img[4];
 
 static void usage(void)
 {
@@ -105,11 +107,15 @@ static void ping(int node) {
 }
 
 static void reset_to_flash(int node, int flash) {
+
 	printf("  Switching to flash %u\n", flash);
-	if (flash)
-		spaceboot_bootalt(node, 1);
-	else
-		spaceboot_bootalt(node, 0);
+
+	param_set_uint8(boot_img[0], 0);
+	param_set_uint8(boot_img[1], 0);
+	param_set_uint8(boot_img[2], 0);
+	param_set_uint8(boot_img[3], 0);
+	param_set_uint8(boot_img[flash], 1);
+	param_push(boot_img, 4, 1, node, 100);
 
 	printf("  Rebooting");
 	csp_reboot(node);
@@ -257,6 +263,16 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to init CSP\n");
 		exit(EXIT_FAILURE);
 	}
+
+	/**
+	 * SETUP:
+	 */
+
+	/* Define temporary parameter */
+	boot_img[0] = param_list_create_remote(21, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img0", 10);
+	boot_img[1] = param_list_create_remote(20, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img1", 10);
+	boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img2", 10);
+	boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img3", 10);
 
 	/**
 	 * STEP 0: Contact system
