@@ -15,9 +15,9 @@ static const struct {
 	unsigned int flash1_addr;
 } products[] = {
 	{"e70", "e70", 0x400000, 0x480000},
-	{"pdu", "pdu", 0x0, 0x20000},
-	{"mppt", "mppt", 0x0, 0x20000},
-	{"dise", "dise", 0x0, 0x20000},
+	{"pdu", "pdu", 0x4000, 0x22000},
+	{"mppt", "mppt", 0x4000, 0x22000},
+	{"dise", "dise", 0x4000, 0x22000},
 };
 
 #endif /* SRC_PRODUCTS_H_ */
