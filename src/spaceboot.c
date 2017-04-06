@@ -30,26 +30,25 @@ param_t * boot_img[4];
 
 static void usage(void)
 {
-	printf("Usage: spaceboot [OPTIONS] [COMMANDS] <TARGET>\n");
+	printf("Usage: spaceboot [OPTIONS] <TARGET> [COMMANDS]\n");
 	printf("\n");
 	printf("CAN Bootloader\n");
 	printf("Copyright (c) 2017 Space Inventor <info@satlab.com>\n");
 	printf("\n");
-	printf(" Options:\n\n");
+	printf(" [OPTIONS]:\n\n");
 	printf("  -i INTERFACE\t\tUse INTERFACE as CAN interface\n");
 	printf("  -n NODE\t\tUse NODE as own CSP address\n");
 	printf("  -h \t\t\tShow help\n");
 	printf("  -l \t\t\tList embedded images\n");
 	printf("  -p PRODUCT\t\t[e70, pdu, mppt, dise]");
+	printf("\n\n");
+	printf(" <TARGET>\t\tCSP node to program\n");
 	printf("\n");
-	printf(" Commands (executed in order):\n\n");
-	printf("  -r [x]\t\tReset to flash <x>\n");
-	printf("  -b [filename]\t\tUpload bootloader to flash slot 1\n");
-	printf("  -f <filename>\t\tUpload file to flash slot 0\n");
-	printf("\n");
-	printf(" Arguments:\n\n");
-	printf(" <target>\t\tCSP node to upload to\n");
-	printf("\n");
+	printf(" [COMMANDS]: (executed in order)\n\n");
+	printf("  -r <slot>\t\tReboot into flash slot\n");
+	printf("  -b <slot>\t\tUpload bootloader\n");
+	printf("  -f <slot>,<filename>\t\tUpload file\n");
+	printf("\n\n");
 }
 
 static void print_images(void) {
@@ -108,7 +107,7 @@ static void ping(int node) {
 
 static void reset_to_flash(int node, int flash) {
 
-	printf("  Switching to flash %u\n", flash);
+	printf("  Switching node %u to flash %u\n", node, flash);
 
 	param_set_uint8(boot_img[0], 0);
 	param_set_uint8(boot_img[1], 0);
@@ -193,16 +192,12 @@ int main(int argc, char **argv)
 	/* Parsed values */
 	uint8_t addr = 31;
 	char *ifc = "can0";
-	int reset = 0;
-	int reset_flash = 0;
-	char file[100] = {};
-	char bootimg[100] = {};
 	int productid = 0;
 
-
-	/* Run parser */
-	int remain, index, c;
-	while ((c = getopt(argc, argv, "+hr::i:n:f:b::lp:")) != -1) {
+	/* Parse Options */
+	int c;
+	while ((c = getopt(argc, argv, "+hli:n:p:")) != -1) {
+		printf("Option %c\n", c);
 		switch (c) {
 		case 'h':
 			usage();
@@ -215,20 +210,6 @@ int main(int argc, char **argv)
 			break;
 		case 'n':
 			addr = atoi(optarg);
-			break;
-		case 'r':
-			reset = 1;
-			if (optarg)
-				reset_flash = atoi(optarg);
-			break;
-		case 'f':
-			strncpy(file, optarg, 100);
-			break;
-		case 'b':
-			if (optarg)
-				strncpy(bootimg, optarg, 100);
-			else
-				strcat(bootimg, products[productid].image);
 			break;
 		case 'p':
 			if (strcmp(optarg, "e70") == 0) {
@@ -248,31 +229,29 @@ int main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 	}
-	remain = argc - optind;
-	index = optind;
 
-	if (remain != 1) {
+	/* Check for <TARGET> */
+	if (argc - optind == 0) {
+		printf("Missing argument <TARGET>\n\n");
 		usage();
 		exit(EXIT_FAILURE);
 	}
 
-	/* Parse remaining options */
-	uint8_t node = atoi(argv[index]);
+	/* Parse <TARGET> */
+	uint8_t node = atoi(argv[optind]);
+	optind++;
 
-	if (configure_csp(addr, ifc) < 0) {
-		fprintf(stderr, "Failed to init CSP\n");
-		exit(EXIT_FAILURE);
-	}
-
-	/**
-	 * SETUP:
-	 */
-
-	/* Define temporary parameter */
+	/* Setup remote parameters */
 	boot_img[0] = param_list_create_remote(21, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img0", 10);
 	boot_img[1] = param_list_create_remote(20, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img1", 10);
 	boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img2", 10);
 	boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img3", 10);
+
+	/* Setup CSP */
+	if (configure_csp(addr, ifc) < 0) {
+		fprintf(stderr, "Failed to init CSP\n");
+		exit(EXIT_FAILURE);
+	}
 
 	/**
 	 * STEP 0: Contact system
@@ -281,26 +260,54 @@ int main(int argc, char **argv)
 	printf("----\n");
 	ping(node);
 
-	/**
-	 * STEP 1: Reset system
-	 */
-	if (reset) {
-		reset_to_flash(node, reset_flash);
+	/* Parse [COMMANDS] */
+	while ((c = getopt(argc, argv, "+:r:b:f:")) != -1) {
+		switch(c) {
+
+		case 'r':
+			reset_to_flash(node, atoi(optarg));
+			break;
+
+		case 'f': {
+
+			char *subarg = strtok(optarg, ",");
+			int slot = atoi(subarg);
+			subarg = strtok(NULL, ",");
+			if (subarg == NULL) {
+				printf("Invalid command argument:\n");
+				printf("Usage: -f <slot>,<path>\n");
+				exit(EXIT_FAILURE);
+			}
+			char *path = subarg;
+
+			char * data;
+			int len;
+			image_get(path, &data, &len);
+			// Todo: Support flash slots in product configuration!
+			upload_and_verify(node, products[productid].flash0_addr, data, len);
+
+			break;
+		}
+
+		case 'b': {
+			printf("\nUPLOAD IMAGE\n");
+			printf("----------\n");
+			char * data;
+			int len;
+			image_get(products[productid].image, &data, &len);
+			int flash_slot = atoi(optarg);
+			printf("  Flash slot %u\n", flash_slot);
+			upload_and_verify(node, products[productid].flash1_addr, data, len);
+			break;
+		}
+
+		default:
+			exit(EXIT_FAILURE);
+			break;
+		}
 	}
 
-	/**
-	 * STEP 2: Upload to flash1
-	 */
-	if (strlen(bootimg)) {
-		printf("\nBOOTLOADER\n");
-		printf("----------\n");
-		char * data;
-		int len;
-		image_get(bootimg, &data, &len);
-		upload_and_verify(node, products[productid].flash1_addr, data, len);
-		reset_to_flash(node, 1);
-	}
-
+#if 0
 	/**
 	 * STEP 3: Upload to flash0
 	 */
@@ -313,6 +320,7 @@ int main(int argc, char **argv)
 		upload_and_verify(node, products[productid].flash0_addr, data, len);
 		reset_to_flash(node, 0);
 	}
+#endif
 
 	return 0;
 }
