@@ -38,6 +38,7 @@ def configure(ctx):
 
 def build(ctx):
     ctx.recurse(modules)
+    ctx.install_files('${PREFIX}/share/man/man1', 'spaceboot.1')
     ctx.program(
         target   = APPNAME,
         source   = ctx.path.ant_glob(['src/*.c', 'images/images.c']),
