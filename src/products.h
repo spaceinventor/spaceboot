@@ -8,16 +8,19 @@
 #ifndef SRC_PRODUCTS_H_
 #define SRC_PRODUCTS_H_
 
+unsigned int addrs_e70[4] = { 0x404000, 0x480000, 0x500000, 0x580000 };
+unsigned int addrs_c21[2] = { 0x004000, 0x022000 };
+
 static const struct {
 	char * name;
 	char * image;
-	unsigned int flash0_addr;
-	unsigned int flash1_addr;
+	unsigned int slots;
+	unsigned int * addrs;
 } products[] = {
-	{"e70", "e70", 0x404000, 0x480000},
-	{"pdu", "pdu", 0x4000, 0x22000},
-	{"mppt", "mppt", 0x4000, 0x22000},
-	{"dise", "dise", 0x4000, 0x22000},
+	{"e70", "e70", 4, addrs_e70},
+	{"pdu", "pdu", 2, addrs_c21},
+	{"mppt", "mppt", 2, addrs_c21},
+	{"dise", "dise", 2, addrs_c21},
 };
 
 #endif /* SRC_PRODUCTS_H_ */
