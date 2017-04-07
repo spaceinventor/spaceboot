@@ -1,0 +1,87 @@
+.TH spaceboot "1"
+.SH "NAME"
+spaceboot \- Programmer for Space Inventor products
+.SH "SYNOPSIS"
+spaceboot [-\fBhl\fR] [-\fBp\fR \fIproductname\fR] [\fB-i\fR \fIinterface\fR] [\fB-n\fR \fInode\fR] \fBTARGET\fR [\fB-r\fR \fIflash\fR[,\fIcount\fR]] [\fB-b\fR] [\fB-f\fR \fIflash\fR,\fIimage\fR]
+.PP
+spaceboot [\fBOPTIONS\fR] \fBTARGET\fR [\fBCOMMANDS\fR]
+
+Commands options can appear multiple times and are executed in order
+.SH "DESCRIPTION"
+spaceboot uses CSP to communicate to a target and control boot and upload of software images.
+
+The \fBOPTIONS\fR will be parsed first and CSP will be setup so the \fBTARGET\fR can be contacted.
+A CSP \fIident\fR message will be sent to the target before continuing.
+When a successfull connection to the TARGET have been established the \fBCOMMAND\fR options will be parsed.
+Commands options can appear multiple times and are executed in order
+
+.SH "OPTIONS"
+.TP
+.B "\-p <productname>"
+Specify the target product. Spaceboot contains bootloaders and flash section mapping for each of these products. To see a list of products see the \fB-l\fR option. 
+
+.TP
+.B "\-i <interface>"
+Specify the can interface to use. If you run spaceboot as superuser the interface will be setup automatically.
+Otherwise the interface must be setup prior to running spaceboot. Here are the recommended can interface settings:
+.br
+sudo ip link set dev can0 down
+.br
+sudo ip link set dev can0 up type can bitrate 1000000 restart-ms 100
+.br
+sudo ip link set dev can0 txqueuelen 100
+
+.TP
+.B "\-n <node>"
+Specify spaceboots own CSP address. The default address is zero which will work fine in the most cases where the target
+is connected directly on the same CAN bus. However when the target is sitting on a remote segment (for example
+over a radio link) the source address is important to setup correctly for the return route to work. Also if the targets
+own address is zero, another source addess is needed for spaceboot.
+
+.TP
+.B "\-l"
+Show a list valid productnames
+
+.TP
+.B "\-h"
+Show a helt text and exit.
+
+.SH "TARGET"
+The targets CSP address must be specified as a mandatory argument to spaceboot.
+
+.SH "COMMANDS"
+.TP
+.B "\-r \fIslot\fR[,\fIcount\fR]"
+Setup the \fIboot_alt\fR parameter for a given flash \fIslot\fR to \fIcount\fR. If count is not specified then count = 1. 
+
+.TP
+.B "\-b"
+Upload an embedded bootloader image to the target in flash slot 1.
+
+Spaceboot contains a prebuilt bootloader for each of the supported products.
+This is a minimum software image that can be used for further software upload. For example if want to overwrite the currently
+running software image in flash slot 0, you can upload a bootloader to flash slot 1 and then use that to write to flash slot 0.
+
+Note: The bootloader is hard linked and can therefore only be uploaded to flash slot 1.
+
+.TP
+.B "\-f \fIslot\fR,\fIimage\fR"
+Upload \fIimage\fR to flash \fIslot\fR.
+
+.SH "EXAMPLES"
+These examples will be uploading software to a PDU with CSP address 18
+.TP
+Reboot into flash slot0 (once)
+spaceboot -p pdu 18 -r0
+
+.TP
+Reboot into flash slot0 (multiple times)
+spaceboot -p pdu 18 -r0,100
+
+.TP
+Upload a bootloader to flash slot1
+spaceboot -p pdu 18 -r0 -b
+
+.TP
+Upload new firmware to flash slot0 (using bootloader as a proxy)
+spaceboot -p pdu 18 -r0 -b -r1 -f0,image.bin
