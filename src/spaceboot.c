@@ -189,7 +189,7 @@ static void upload_and_verify(int node, int address, char * data, int len) {
 	for (int i = 0; i < len; i++) {
 		if (datain[i] == data[i])
 			continue;
-		printf("Diff at %x: %hhx != %hhx\n", 0x480000 + i, data[i], datain[i]);
+		printf("Diff at %x: %hhx != %hhx\n", address + i, data[i], datain[i]);
 		exit(EXIT_FAILURE);
 	}
 
