@@ -13,4 +13,5 @@
 *.swp
 build
 *.cfg
-*.lzo
+.lzo
+builddir

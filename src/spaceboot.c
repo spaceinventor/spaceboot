@@ -72,13 +72,12 @@ static int configure_csp(uint8_t addr, char *ifc)
 	if (csp_buffer_init(100, 320) < 0)
 		return -1;
 
-	csp_set_hostname("satctl");
-	csp_set_model("linux");
-
-	//csp_debug_set_level(4, 1);
-	//csp_debug_set_level(5, 1);
-
-	if (csp_init(addr) < 0)
+	csp_conf_t csp_config;
+	csp_conf_get_defaults(&csp_config);
+	csp_config.address = addr;
+	csp_config.hostname = "spaceboot";
+	csp_config.model = "linux";
+	if (csp_init(&csp_config) < 0)
 		return -1;
 
 	csp_iface_t *can0 = csp_can_socketcan_init(ifc, 1000000, 0);
