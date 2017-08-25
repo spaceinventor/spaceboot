@@ -42,6 +42,7 @@ static void usage(void)
 	printf("  -h \t\t\tShow help\n");
 	printf("  -l \t\t\tList embedded images\n");
 	printf("  -p PRODUCT\t\t[e70, pdu, mppt, dise]");
+	printf("  -w \t\t\tDo not verify image uploads\n");
 	printf("\n\n");
 	printf(" <TARGET>\t\tCSP node to program\n");
 	printf("\n");
@@ -126,8 +127,8 @@ static void reset_to_flash(int node, int flash, int times) {
 
 	printf("  Rebooting");
 	csp_reboot(node);
-	int step = 100;
-	int ms = 1000;
+	int step = 25;
+	int ms = 250;
 	while(ms > 0) {
 		printf(".");
 		fflush(stdout);
@@ -173,16 +174,21 @@ static void image_get(char * filename, char ** data, int * len) {
 
 }
 
+static void upload(int node, int address, char * data, int len) {
+
+	unsigned int timeout = 10000;
+	printf("  Upload %u bytes to node %u addr 0x%x\n", len, node, address);
+	vmem_upload(node, timeout, address, data, len);
+
+}
+
 static void upload_and_verify(int node, int address, char * data, int len) {
 
 	unsigned int timeout = 10000;
-
 	printf("  Upload %u bytes to node %u addr 0x%x\n", len, node, address);
-
 	vmem_upload(node, timeout, address, data, len);
 
 	char * datain = malloc(len);
-
 	vmem_download(node, timeout, address, len, datain);
 
 	for (int i = 0; i < len; i++) {
@@ -200,10 +206,11 @@ int main(int argc, char **argv)
 	/* Parsed values */
 	uint8_t addr = 31;
 	char *ifc = "can0";
+	int verify = true;
 
 	/* Parse Options */
 	int c;
-	while ((c = getopt(argc, argv, "+hli:n:p:")) != -1) {
+	while ((c = getopt(argc, argv, "+hlwi:n:p:")) != -1) {
 
 		switch (c) {
 		case 'h':
@@ -212,6 +219,9 @@ int main(int argc, char **argv)
 		case 'l':
 			print_images();
 			exit(EXIT_SUCCESS);
+		case 'w':
+			verify = false;
+			break;
 		case 'i':
 			ifc = optarg;
 			break;
@@ -320,7 +330,10 @@ int main(int argc, char **argv)
 				exit(EXIT_FAILURE);
 			}
 
-			upload_and_verify(node, products[productid].addrs[slot], data, len);
+			if (verify)
+				upload_and_verify(node, products[productid].addrs[slot], data, len);
+			else
+				upload(node, products[productid].addrs[slot], data, len);
 
 			break;
 		}
