@@ -13,7 +13,7 @@ sources = [
 
 spaceboot = executable('spaceboot', sources,
 	dependencies : [csp_dep, param_dep],
-	link_args : ['-Wl,-Map=spaceboot.map'],
+	link_args : ['-Wl,-Map=spaceboot.map', '-lm'],
 	c_args : ['-DIMAGEDIR="../images"'],
 	install : true,
 )
