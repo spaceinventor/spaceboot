@@ -41,9 +41,9 @@ static void usage(void)
 	printf("  -n NODE\t\tUse NODE as own CSP address\n");
 	printf("  -h \t\t\tShow help\n");
 	printf("  -l \t\t\tList embedded images\n");
-	printf("  -p PRODUCT\t\t[e70, pdu, mppt, dise]");
+	printf("  -p PRODUCT\t\t[e70, pdu, mppt, dise]\n");
 	printf("  -w \t\t\tDo not verify image uploads\n");
-	printf("\n\n");
+	printf("\n");
 	printf(" <TARGET>\t\tCSP node to program\n");
 	printf("\n");
 	printf(" [COMMANDS]: (executed in order)\n\n");
