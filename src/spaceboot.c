@@ -116,14 +116,19 @@ static void reset_to_flash(int node, int flash, int times) {
 	printf("  Switching to flash %d\n", flash);
 	printf("  Will run this image %d times\n", times);
 
-	param_set_uint8(boot_img[0], 0);
-	param_set_uint8(boot_img[1], 0);
+	char queue_buf[25];
+	param_queue_t queue;
+	param_queue_init(&queue, queue_buf, 25, 0, PARAM_QUEUE_TYPE_SET);
+
+	uint8_t zero = 0;
+	param_queue_add(&queue, boot_img[0], 0, &zero);
+	param_queue_add(&queue, boot_img[1], 0, &zero);
 	if (products[productid].slots > 2)
-		param_set_uint8(boot_img[2], 0);
-	if (products[productid].slots > 2)
-		param_set_uint8(boot_img[3], 0);
-	param_set_uint8(boot_img[flash], times);
-	param_push(boot_img, products[productid].slots, 1, node, 100);
+		param_queue_add(&queue, boot_img[2], 0, &zero);
+	if (products[productid].slots > 3)
+	param_queue_add(&queue, boot_img[3], 0, &zero);
+	param_queue_add(&queue, boot_img[flash], 0, &times);
+	param_push_queue(&queue, 1, node, 100);
 
 	printf("  Rebooting");
 	csp_reboot(node);
@@ -259,12 +264,12 @@ int main(int argc, char **argv)
 	optind++;
 
 	/* Setup remote parameters */
-	boot_img[0] = param_list_create_remote(21, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img0", 10);
-	boot_img[1] = param_list_create_remote(20, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img1", 10);
+	boot_img[0] = param_list_create_remote(21, node, PARAM_TYPE_UINT8, 0, "boot_img0", 10);
+	boot_img[1] = param_list_create_remote(20, node, PARAM_TYPE_UINT8, 0, "boot_img1", 10);
 	if (products[productid].slots > 2)
-		boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img2", 10);
+		boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, 0, "boot_img2", 10);
 	if (products[productid].slots > 3)
-		boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, 0, sizeof(uint8_t), "boot_img3", 10);
+		boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, 0, "boot_img3", 10);
 
 	/* Setup CSP */
 	if (configure_csp(addr, ifc) < 0) {
