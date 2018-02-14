@@ -184,6 +184,8 @@ static void upload(int node, int address, char * data, int len) {
 	unsigned int timeout = 10000;
 	printf("  Upload %u bytes to node %u addr 0x%x\n", len, node, address);
 	vmem_upload(node, timeout, address, data, len);
+	printf("  Waiting for flash driver to flush\n");
+	usleep(100000);
 
 }
 
