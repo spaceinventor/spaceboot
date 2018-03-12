@@ -62,12 +62,12 @@ Upload \fIimage\fR to flash \fIslot\fR.
 These examples will be uploading software to a PDU with CSP address 18
 .TP
 Reboot into flash slot0 (once)
-spaceboot -p pdu 18 -r0
+spaceboot -p c21 18 -r0
 
 .TP
 Reboot into flash slot0 (multiple times)
-spaceboot -p pdu 18 -r0,100
+spaceboot -p c21 18 -r0,100
 
 .TP
 Upload new firmware to flash slot0 (using bootloader as a proxy)
-spaceboot -p pdu 18 -r0 -b -r1 -f0,image.bin
+spaceboot -p c21 18 -r0 -b -r1 -f0,image.bin
