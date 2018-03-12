@@ -8,7 +8,6 @@ param_dep = param.get_variable('param_dep')
 
 sources = [
 	'src/spaceboot.c',
-	'images/images.c',
 ]
 
 spaceboot = executable('spaceboot', sources,

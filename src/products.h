@@ -18,9 +18,7 @@ static const struct {
 	unsigned int * addrs;
 } products[] = {
 	{"e70", "e70", 4, addrs_e70},
-	{"pdu", "pdu", 2, addrs_c21},
-	{"mppt", "mppt", 2, addrs_c21},
-	{"dise", "dise", 2, addrs_c21},
+	{"c21", "c21", 2, addrs_c21},
 };
 
 #endif /* SRC_PRODUCTS_H_ */

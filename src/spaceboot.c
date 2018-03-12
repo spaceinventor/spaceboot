@@ -23,11 +23,10 @@
 #include <csp/drivers/usart.h>
 #include <csp/drivers/can_socketcan.h>
 
-#include "../images/images.h"
 #include "products.h"
 
 param_t * boot_img[4];
-static int productid = 0;
+static int productid = 1;
 
 static void usage(void)
 {
@@ -40,31 +39,15 @@ static void usage(void)
 	printf("  -i INTERFACE\t\tUse INTERFACE as CAN interface\n");
 	printf("  -n NODE\t\tUse NODE as own CSP address\n");
 	printf("  -h \t\t\tShow help\n");
-	printf("  -l \t\t\tList embedded images\n");
-	printf("  -p PRODUCT\t\t[e70, pdu, mppt, dise]\n");
+	printf("  -p PRODUCT\t\t[e70, c21]\n");
 	printf("  -w \t\t\tDo not verify image uploads\n");
 	printf("\n");
 	printf(" <TARGET>\t\tCSP node to program\n");
 	printf("\n");
 	printf(" [COMMANDS]: (executed in order)\n\n");
 	printf("  -r <slot>,[count]\tReboot into flash slot [count] times\n");
-	printf("  -b \t\t\tUpload bootloader (will use flat slot 1)\n");
 	printf("  -f <slot>,<filename>\tUpload file\n");
 	printf("\n\n");
-}
-
-static void print_images(void) {
-
-	printf("\n");
-	printf("CAN Bootloader\n");
-	printf("Copyright (c) 2017 Space Inventor <info@satlab.com>\n");
-	printf("\n");
-	printf(" Images:\n");
-	for (int i = 0; images[i].name != NULL; i++) {
-		printf("  %s\n", images[i].name);
-	}
-	printf("\n");
-
 }
 
 static int configure_csp(uint8_t addr, char *ifc)
@@ -148,16 +131,6 @@ static void reset_to_flash(int node, int flash, int times) {
 
 static void image_get(char * filename, char ** data, int * len) {
 
-	/* Check for embedded image */
-	for (int i = 0; images[i].name != NULL; i++) {
-		if (strcmp(filename, images[i].name) == 0) {
-			*data = (char *) images[i].data;
-			*len = *images[i].len;
-			printf("  Using embedded image: %s\n", filename);
-			return;
-		}
-	}
-
 	/* Open file */
 	FILE * fd = fopen(filename, "r");
 	if (fd == NULL) {
@@ -222,9 +195,6 @@ int main(int argc, char **argv)
 		switch (c) {
 		case 'h':
 			usage();
-			exit(EXIT_SUCCESS);
-		case 'l':
-			print_images();
 			exit(EXIT_SUCCESS);
 		case 'w':
 			verify = false;
@@ -342,20 +312,6 @@ int main(int argc, char **argv)
 			else
 				upload(node, products[productid].addrs[slot], data, len);
 
-			break;
-		}
-
-		case 'b': {
-
-			printf("\n");
-			printf("UPLOAD BOOTLOADER\n");
-			printf("----------\n");
-
-			char * data;
-			int len;
-			image_get(products[productid].image, &data, &len);
-
-			upload_and_verify(node, products[productid].addrs[1], data, len);
 			break;
 		}
 
