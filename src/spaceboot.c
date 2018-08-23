@@ -73,7 +73,7 @@ static int configure_csp(uint8_t addr, char *ifc)
 		return -1;
 
 
-	csp_rdp_set_opt(2, 10000, 2000, 1, 1000, 2);
+	csp_rdp_set_opt(4, 5000, 2500, 1, 1000, 4);
 
 	return 0;
 }
