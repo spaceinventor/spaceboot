@@ -28,6 +28,16 @@
 param_t * boot_img[4];
 static int productid = 1;
 
+/* Parsed values */
+uint8_t addr = 31;
+char *can_dev = "can0";
+int verify = true;
+char *uart_dev = "/dev/ttyUSB0";
+uint32_t uart_baud = 1000000;
+int use_uart = 0;
+int use_can = 1;
+
+
 static void usage(void)
 {
 	printf("Usage: spaceboot [OPTIONS] <TARGET> [COMMANDS]\n");
@@ -48,34 +58,6 @@ static void usage(void)
 	printf("  -r <slot>,[count]\tReboot into flash slot [count] times\n");
 	printf("  -f <slot>,<filename>\tUpload file\n");
 	printf("\n\n");
-}
-
-static int configure_csp(uint8_t addr, char *ifc)
-{
-
-	if (csp_buffer_init(100, 320) < 0)
-		return -1;
-
-	csp_conf_t csp_config;
-	csp_conf_get_defaults(&csp_config);
-	csp_config.address = addr;
-	csp_config.hostname = "spaceboot";
-	csp_config.model = "linux";
-	if (csp_init(&csp_config) < 0)
-		return -1;
-
-	csp_iface_t *can0 = csp_can_socketcan_init(ifc, 1000000, 0);
-
-	if (csp_route_set(CSP_DEFAULT_ROUTE, can0, CSP_NODE_MAC) < 0)
-		return -1;
-
-	if (csp_route_start_task(0, 0) < 0)
-		return -1;
-
-
-	csp_rdp_set_opt(4, 5000, 2500, 1, 1000, 4);
-
-	return 0;
 }
 
 static void ping(int node) {
@@ -124,6 +106,22 @@ static void reset_to_flash(int node, int flash, int times) {
 		ms -= step;
 	}
 	printf("\n");
+
+	if (use_uart) {
+		printf("  Switch to KISS mode");
+		char *cmd = "\nset kiss_mode 1\n";
+		usart_putstr(cmd, strlen(cmd));
+
+		int step = 25;
+		int ms = 250;
+		while(ms > 0) {
+			printf(".");
+			fflush(stdout);
+			csp_sleep_ms(step);
+			ms -= step;
+		}
+		printf("\n");
+	}
 
 	ping(node);
 
@@ -183,14 +181,9 @@ static void upload_and_verify(int node, int address, char * data, int len) {
 
 int main(int argc, char **argv)
 {
-	/* Parsed values */
-	uint8_t addr = 31;
-	char *ifc = "can0";
-	int verify = true;
-
 	/* Parse Options */
 	int c;
-	while ((c = getopt(argc, argv, "+hlwi:n:p:")) != -1) {
+	while ((c = getopt(argc, argv, "+hlwb:c:u:n:p:")) != -1) {
 
 		switch (c) {
 		case 'h':
@@ -199,8 +192,18 @@ int main(int argc, char **argv)
 		case 'w':
 			verify = false;
 			break;
-		case 'i':
-			ifc = optarg;
+		case 'c':
+			use_uart = 0;
+			use_can = 1;
+			can_dev = optarg;
+			break;
+		case 'u':
+			use_uart = 1;
+			use_can = 0;
+			uart_dev = optarg;
+			break;
+		case 'b':
+			uart_baud = atoi(optarg);
 			break;
 		case 'n':
 			addr = atoi(optarg);
@@ -244,10 +247,56 @@ int main(int argc, char **argv)
 		boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, 0, "boot_img3", 10);
 
 	/* Setup CSP */
-	if (configure_csp(addr, ifc) < 0) {
-		fprintf(stderr, "Failed to init CSP\n");
-		exit(EXIT_FAILURE);
+	if (csp_buffer_init(100, 320) < 0)
+		return -1;
+
+	csp_conf_t csp_config;
+	csp_conf_get_defaults(&csp_config);
+	csp_config.address = addr;
+	csp_config.hostname = "spaceboot";
+	csp_config.model = "linux";
+	if (csp_init(&csp_config) < 0)
+		return -1;
+
+	if (use_uart) {
+		struct usart_conf usart_conf = {
+				.device = uart_dev,
+				.baudrate = uart_baud,
+		};
+		usart_init(&usart_conf);
+
+		static csp_iface_t kiss_if;
+		static csp_kiss_handle_t kiss_handle;
+		void kiss_usart_putchar(char c) {
+			usart_putc(c);
+		}
+		void kiss_usart_callback(uint8_t *buf, int len, void *pxTaskWoken) {
+			csp_kiss_rx(&kiss_if, buf, len, pxTaskWoken);
+		}
+		usart_set_callback(kiss_usart_callback);
+		csp_kiss_init(&kiss_if, &kiss_handle, kiss_usart_putchar, NULL, "KISS");
+		csp_route_set(CSP_DEFAULT_ROUTE, &kiss_if, CSP_NODE_MAC);
+		printf("Using usart %s baud %u\n", uart_dev, uart_baud);
+
+		/* Switch to kiss mode */
+		char *cmd = "\nset kiss_mode 1\n";
+		usart_putstr(cmd, strlen(cmd));
 	}
+
+	if (use_can) {
+		csp_iface_t *can0 = csp_can_socketcan_init(can_dev, 1000000, 0);
+		if (can0) {
+			if (csp_route_set(CSP_DEFAULT_ROUTE, can0, CSP_NODE_MAC) < 0) {
+				return -1;
+			}
+		}
+		printf("Using can %s baud %u\n", can_dev, 1000000);
+	}
+
+	if (csp_route_start_task(0, 0) < 0)
+		return -1;
+
+	csp_rdp_set_opt(4, 5000, 2500, 1, 1000, 4);
 
 	/**
 	 * STEP 0: Contact system
