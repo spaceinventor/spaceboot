@@ -2,7 +2,7 @@
 .SH "NAME"
 spaceboot \- Programmer for Space Inventor products
 .SH "SYNOPSIS"
-spaceboot [-\fBh\fR] [-\fBp\fR \fIproductname\fR] [\fB-i\fR \fIinterface\fR] [\fB-n\fR \fInode\fR] \fBTARGET\fR [\fB-r\fR \fIflash\fR[,\fIcount\fR]] [\fB-f\fR \fIflash\fR,\fIimage\fR]
+spaceboot [-\fBh\fR] [-\fBp\fR \fIproductname\fR] [\fB-c\fR \fIcanif\fR] [\fB-u\fR \fIuartdev\fR] [\fB-b\fR \fIuartbaud\fR] [\fB-n\fR \fInode\fR] \fBTARGET\fR [\fB-r\fR \fIflash\fR[,\fIcount\fR]] [\fB-f\fR \fIflash\fR,\fIimage\fR]
 .PP
 spaceboot [\fBOPTIONS\fR] \fBTARGET\fR [\fBCOMMANDS\fR]
 
@@ -21,7 +21,7 @@ Commands options can appear multiple times and are executed in order
 Specify the target product. Spaceboot contains bootloaders and flash section mapping for each of these products. To see a list of products see the \fB-l\fR option. 
 
 .TP
-.B "\-i <interface>"
+.B "\-c <can interface>"
 Specify the can interface to use. If you run spaceboot as superuser the interface will be setup automatically.
 Otherwise the interface must be setup prior to running spaceboot. Here are the recommended can interface settings:
 .br
@@ -30,6 +30,14 @@ sudo ip link set dev can0 down
 sudo ip link set dev can0 up type can bitrate 1000000 restart-ms 100
 .br
 sudo ip link set dev can0 txqueuelen 100
+
+.TP
+.B "\-u <usart device>"
+Specify which device to use. For example /dev/ttyUSB0
+
+.TP
+.B "\-b <usart baud>"
+Specify usart baudrate
 
 .TP
 .B "\-n <node>"

@@ -43,10 +43,12 @@ static void usage(void)
 	printf("Usage: spaceboot [OPTIONS] <TARGET> [COMMANDS]\n");
 	printf("\n");
 	printf("CAN Bootloader\n");
-	printf("Copyright (c) 2017 Space Inventor <info@satlab.com>\n");
+	printf("Copyright (c) 2016-2019 Space Inventor <info@satlab.com>\n");
 	printf("\n");
 	printf(" [OPTIONS]:\n\n");
-	printf("  -i INTERFACE\t\tUse INTERFACE as CAN interface\n");
+	printf("  -c INTERFACE,\tUse INTERFACE as CAN interface\n");
+	printf("  -u INTERFACE,\tUse INTERFACE as UART interface\n");
+	printf("  -b BAUD,\tUART buad rate\n");
 	printf("  -n NODE\t\tUse NODE as own CSP address\n");
 	printf("  -h \t\t\tShow help\n");
 	printf("  -p PRODUCT\t\t[e70, c21]\n");
