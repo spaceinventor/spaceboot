@@ -16,6 +16,7 @@
 
 #include <csp/csp.h>
 #include <csp/csp_cmp.h>
+#include <csp/csp_endian.h>
 #include <csp/arch/csp_time.h>
 #include <csp/arch/csp_thread.h>
 #include <csp/interfaces/csp_if_can.h>
@@ -29,13 +30,14 @@ param_t * boot_img[4];
 static int productid = 1;
 
 /* Parsed values */
-uint8_t addr = 31;
+uint8_t addr = 1;
 char *can_dev = "can0";
 int verify = true;
 char *uart_dev = "/dev/ttyUSB0";
 uint32_t uart_baud = 1000000;
 int use_uart = 0;
 int use_can = 1;
+int use_slash = 0;
 
 
 static void usage(void)
@@ -51,6 +53,7 @@ static void usage(void)
 	printf("  -b BAUD,\tUART buad rate\n");
 	printf("  -n NODE\t\tUse NODE as own CSP address\n");
 	printf("  -h \t\t\tShow help\n");
+	printf("  -s \t\t\tSearch for images with slash (build-slash)\n");
 	printf("  -p PRODUCT\t\t[e70, c21]\n");
 	printf("  -w \t\t\tDo not verify image uploads\n");
 	printf("\n");
@@ -58,7 +61,7 @@ static void usage(void)
 	printf("\n");
 	printf(" [COMMANDS]: (executed in order)\n\n");
 	printf("  -r <slot>,[count]\tReboot into flash slot [count] times\n");
-	printf("  -f <slot>,<filename>\tUpload file\n");
+	printf("  -f <slot>,[filename]\tUpload file\n");
 	printf("\n\n");
 }
 
@@ -71,6 +74,49 @@ static void ping(int node) {
 	}
 	printf("  | %s\n  | %s\n  | %s\n  | %s %s\n", message.ident.hostname, message.ident.model, message.ident.revision, message.ident.date, message.ident.time);
 
+}
+
+static vmem_list_t vmem_list_find(int node, int timeout, char * name, int namelen) {
+	vmem_list_t ret = {};
+
+	csp_conn_t * conn = csp_connect(CSP_PRIO_HIGH, node, VMEM_PORT_SERVER, timeout, CSP_O_NONE);
+	if (conn == NULL)
+		return ret;
+
+	csp_packet_t * packet = csp_buffer_get(sizeof(vmem_request_t));
+	vmem_request_t * request = (void *) packet->data;
+	request->version = VMEM_VERSION;
+	request->type = VMEM_SERVER_LIST;
+	packet->length = sizeof(vmem_request_t);
+
+	if (!csp_send(conn, packet, VMEM_SERVER_TIMEOUT)) {
+		csp_buffer_free(packet);
+		return ret;
+	}
+
+	/* Wait for response */
+	packet = csp_read(conn, timeout);
+	if (packet == NULL) {
+		printf("No response\n");
+		csp_close(conn);
+		return ret;
+	}
+
+	for (vmem_list_t * vmem = (void *) packet->data; (intptr_t) vmem < (intptr_t) packet->data + packet->length; vmem++) {
+		//printf(" %u: %-5.5s 0x%08X - %u typ %u\r\n", vmem->vmem_id, vmem->name, (unsigned int) csp_ntoh32(vmem->vaddr), (unsigned int) csp_ntoh32(vmem->size), vmem->type);
+		if (strncmp(vmem->name, name, namelen) == 0) {
+			ret.vmem_id = vmem->vmem_id;
+			ret.type = vmem->type;
+			memcpy(ret.name, vmem->name, 5);
+			ret.vaddr = csp_ntoh32(vmem->vaddr);
+			ret.size = csp_ntoh32(vmem->size);
+		}
+	}
+
+	csp_buffer_free(packet);
+	csp_close(conn);
+
+	return ret;
 }
 
 static void reset_to_flash(int node, int flash, int times) {
@@ -185,7 +231,7 @@ int main(int argc, char **argv)
 {
 	/* Parse Options */
 	int c;
-	while ((c = getopt(argc, argv, "+hlwb:c:u:n:p:")) != -1) {
+	while ((c = getopt(argc, argv, "+hlwsb:c:u:n:p:")) != -1) {
 
 		switch (c) {
 		case 'h':
@@ -193,6 +239,9 @@ int main(int argc, char **argv)
 			exit(EXIT_SUCCESS);
 		case 'w':
 			verify = false;
+			break;
+		case 's':
+			use_slash = 1;
 			break;
 		case 'c':
 			use_uart = 0;
@@ -338,30 +387,55 @@ int main(int argc, char **argv)
 			printf("UPLOAD IMAGE\n");
 			printf("----------\n");
 
+			char path[100];
 			char *subarg = strtok(optarg, ",");
 			int slot = atoi(subarg);
 			subarg = strtok(NULL, ",");
-			if (subarg == NULL) {
-				printf("Invalid command argument:\n");
-				printf("  Usage: -f <slot>,<path>\n");
-				exit(EXIT_FAILURE);
+			if (subarg != NULL) {
+				strncpy(path, subarg, 100);
+			} else {
+				if (use_slash) {
+					snprintf(path, 100, "build-slash-%u/com-%u.bin", slot, slot);
+				} else {
+					snprintf(path, 100, "build-noslash-%u/com-%u.bin", slot, slot);
+				}
+				if (access(path, F_OK) != 0) {
+					printf("Failed to find: %s\n", path);
+					exit(EXIT_FAILURE);
+				} else {
+					printf("  Found software image: %s\n", path);
+				}
 			}
-			char *path = subarg;
+
 
 			char * data;
 			int len;
 			image_get(path, &data, &len);
 
-			if (slot > products[productid].slots - 1) {
-				printf("Slot out of range:\n");
-				printf("  max slot number is %u\n", products[productid].slots);
+			char vmem_name[5];
+			snprintf(vmem_name, 5, "fl%u", slot);
+
+			printf("  Requesting VMEM name: %s...\n", vmem_name);
+
+			vmem_list_t vmem = vmem_list_find(node, 5000, vmem_name, strlen(vmem_name));
+			if (vmem.size == 0) {
+				printf("Failed to find vmem on subsystem\n");
+				exit(EXIT_FAILURE);
+			} else {
+				printf("  Found vmem\n");
+				printf("    Base address: 0x%x\n", vmem.vaddr);
+				printf("    Size: %u\n", vmem.size);
+			}
+
+			if (len > vmem.size) {
+				printf("Software image too large for vmem\n");
 				exit(EXIT_FAILURE);
 			}
 
 			if (verify)
-				upload_and_verify(node, products[productid].addrs[slot], data, len);
+				upload_and_verify(node, vmem.vaddr, data, len);
 			else
-				upload(node, products[productid].addrs[slot], data, len);
+				upload(node, vmem.vaddr, data, len);
 
 			break;
 		}
