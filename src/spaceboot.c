@@ -290,12 +290,12 @@ int main(int argc, char **argv)
 	optind++;
 
 	/* Setup remote parameters */
-	boot_img[0] = param_list_create_remote(21, node, PARAM_TYPE_UINT8, 0, "boot_img0", 10);
-	boot_img[1] = param_list_create_remote(20, node, PARAM_TYPE_UINT8, 0, "boot_img1", 10);
+	boot_img[0] = param_list_create_remote(21, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img0", 10);
+	boot_img[1] = param_list_create_remote(20, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img1", 10);
 	if (products[productid].slots > 2)
-		boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, 0, "boot_img2", 10);
+		boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img2", 10);
 	if (products[productid].slots > 3)
-		boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, 0, "boot_img3", 10);
+		boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img3", 10);
 
 	/* Setup CSP */
 	if (csp_buffer_init(100, 320) < 0)

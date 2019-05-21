@@ -1,4 +1,4 @@
-project('spaceboot', 'c', subproject_dir: 'lib', default_options: ['buildtype=release', 'c_std=gnu99', 'b_lto=true'])
+project('spaceboot', 'c', subproject_dir: 'lib', default_options: ['buildtype=release', 'c_std=gnu99'])
 
 csp = subproject('csp')
 csp_dep = csp.get_variable('csp_dep')
