@@ -24,10 +24,7 @@
 #include <csp/drivers/usart.h>
 #include <csp/drivers/can_socketcan.h>
 
-#include "products.h"
-
 param_t * boot_img[4];
-static int productid = 1;
 
 /* Parsed values */
 uint8_t addr = 1;
@@ -121,11 +118,6 @@ static vmem_list_t vmem_list_find(int node, int timeout, char * name, int namele
 
 static void reset_to_flash(int node, int flash, int times) {
 
-	if (flash >= products[productid].slots) {
-		printf("Error: invalid slot number %u\n", flash);
-		exit(EXIT_FAILURE);
-	}
-
 	printf("  Switching to flash %d\n", flash);
 	printf("  Will run this image %d times\n", times);
 
@@ -136,9 +128,7 @@ static void reset_to_flash(int node, int flash, int times) {
 	uint8_t zero = 0;
 	param_queue_add(&queue, boot_img[0], 0, &zero);
 	param_queue_add(&queue, boot_img[1], 0, &zero);
-	if (products[productid].slots > 2)
-		param_queue_add(&queue, boot_img[2], 0, &zero);
-	if (products[productid].slots > 3)
+	param_queue_add(&queue, boot_img[2], 0, &zero);
 	param_queue_add(&queue, boot_img[3], 0, &zero);
 	param_queue_add(&queue, boot_img[flash], 0, &times);
 	param_push_queue(&queue, 1, node, 100);
@@ -259,20 +249,6 @@ int main(int argc, char **argv)
 		case 'n':
 			addr = atoi(optarg);
 			break;
-		case 'p':
-			if (strcmp(optarg, "e70") == 0) {
-				productid = 0;
-			} else if (strcmp(optarg, "pdu") == 0) {
-				productid = 1;
-			} else if (strcmp(optarg, "mppt") == 0) {
-				productid = 2;
-			} else if (strcmp(optarg, "dise") == 0) {
-				productid = 3;
-			} else {
-				printf("Invalid product selected, choose either [e70, pdu, mppt, dise]\n");
-				exit(EXIT_FAILURE);
-			}
-			break;
 		default:
 			exit(EXIT_FAILURE);
 		}
@@ -292,10 +268,8 @@ int main(int argc, char **argv)
 	/* Setup remote parameters */
 	boot_img[0] = param_list_create_remote(21, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img0", 10);
 	boot_img[1] = param_list_create_remote(20, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img1", 10);
-	if (products[productid].slots > 2)
-		boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img2", 10);
-	if (products[productid].slots > 3)
-		boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img3", 10);
+	boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img2", 10);
+	boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img3", 10);
 
 	/* Setup CSP */
 	if (csp_buffer_init(100, 320) < 0)
