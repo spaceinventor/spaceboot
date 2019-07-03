@@ -36,6 +36,8 @@ int use_uart = 0;
 int use_can = 1;
 int use_slash = 0;
 
+VMEM_DEFINE_STATIC_RAM(test, "test", 10000);
+
 
 static void usage(void)
 {
