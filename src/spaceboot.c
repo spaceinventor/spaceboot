@@ -138,7 +138,7 @@ static void reset_to_flash(int node, int flash, int times) {
 	printf("  Rebooting");
 	csp_reboot(node);
 	int step = 25;
-	int ms = 250;
+	int ms = 1000;
 	while(ms > 0) {
 		printf(".");
 		fflush(stdout);

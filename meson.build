@@ -4,7 +4,7 @@ csp = subproject('csp')
 csp_dep = csp.get_variable('csp_dep')
 
 param = subproject('param')
-param_dep = param.get_variable('param_dep')
+param_dep = param.get_variable('param_dep_whole')
 
 sources = [
 	'src/spaceboot.c',
