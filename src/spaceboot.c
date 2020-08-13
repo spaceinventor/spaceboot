@@ -35,6 +35,7 @@ uint32_t uart_baud = 1000000;
 int use_uart = 0;
 int use_can = 1;
 int use_slash = 0;
+int csp_version = 2;
 
 VMEM_DEFINE_STATIC_RAM(test, "test", 10000);
 
@@ -55,6 +56,7 @@ static void usage(void)
 	printf("  -s \t\t\tSearch for images with slash (build-slash)\n");
 	printf("  -p PRODUCT\t\t[e70, c21]\n");
 	printf("  -w \t\t\tDo not verify image uploads\n");
+	printf("  -v CSP version [1, 2]\n");
 	printf("\n");
 	printf(" <TARGET>\t\tCSP node to program\n");
 	printf("\n");
@@ -148,10 +150,6 @@ static void reset_to_flash(int node, int flash, int times) {
 	printf("\n");
 
 	if (use_uart) {
-		printf("  Switch to KISS mode");
-		char *cmd = "\nset kiss_mode 1\n";
-		usart_putstr(cmd, strlen(cmd));
-
 		int step = 25;
 		int ms = 250;
 		while(ms > 0) {
@@ -251,6 +249,9 @@ int main(int argc, char **argv)
 		case 'n':
 			addr = atoi(optarg);
 			break;
+        case 'v':
+            csp_version = atoi(optarg);
+            break;
 		default:
 			exit(EXIT_FAILURE);
 		}
@@ -273,52 +274,44 @@ int main(int argc, char **argv)
 	boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img2", 10);
 	boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img3", 10);
 
-	/* Setup CSP */
-	if (csp_buffer_init(100, 320) < 0)
-		return -1;
+    csp_conf_t csp_config;
+    csp_conf_get_defaults(&csp_config);
+    csp_config.version = csp_version;
+    csp_config.buffers = 100;
+    csp_config.buffer_data_size = 2100;
+    csp_config.address = addr;
+    csp_config.hostname = "spaceboot";
+    csp_config.revision = "";
+    csp_config.model = "linux";
+    if (csp_init(&csp_config) < 0)
+        return -1;
 
-	csp_conf_t csp_config;
-	csp_conf_get_defaults(&csp_config);
-	csp_config.address = addr;
-	csp_config.hostname = "spaceboot";
-	csp_config.model = "linux";
-	if (csp_init(&csp_config) < 0)
-		return -1;
+    csp_iface_t * default_iface = NULL;
+    if (use_uart) {
+        csp_usart_conf_t conf = {
+            .device = uart_dev,
+            .baudrate = uart_baud, /* supported on all platforms */
+            .databits = 8,
+            .stopbits = 1,
+            .paritysetting = 0,
+            .checkparity = 0
+        };
+        int error = csp_usart_open_and_add_kiss_interface(&conf, CSP_IF_KISS_DEFAULT_NAME, &default_iface);
+        if (error != CSP_ERR_NONE) {
+            csp_log_error("failed to add KISS interface [%s], error: %d", uart_dev, error);
+            exit(1);
+        }
 
-	if (use_uart) {
-		struct usart_conf usart_conf = {
-				.device = uart_dev,
-				.baudrate = uart_baud,
-		};
-		usart_init(&usart_conf);
+        printf("Using usart %s baud %u\n", uart_dev, uart_baud);
+    }
 
-		static csp_iface_t kiss_if;
-		static csp_kiss_handle_t kiss_handle;
-		void kiss_usart_putchar(char c) {
-			usart_putc(c);
-		}
-		void kiss_usart_callback(uint8_t *buf, int len, void *pxTaskWoken) {
-			csp_kiss_rx(&kiss_if, buf, len, pxTaskWoken);
-		}
-		usart_set_callback(kiss_usart_callback);
-		csp_kiss_init(&kiss_if, &kiss_handle, kiss_usart_putchar, NULL, "KISS");
-		csp_route_set(CSP_DEFAULT_ROUTE, &kiss_if, CSP_NODE_MAC);
-		printf("Using usart %s baud %u\n", uart_dev, uart_baud);
-
-		/* Switch to kiss mode */
-		char *cmd = "\nset kiss_mode 1\n";
-		usart_putstr(cmd, strlen(cmd));
-	}
-
-	if (use_can) {
-		csp_iface_t *can0 = csp_can_socketcan_init(can_dev, 1000000, 0);
-		if (can0) {
-			if (csp_route_set(CSP_DEFAULT_ROUTE, can0, CSP_NODE_MAC) < 0) {
-				return -1;
-			}
-		}
-		printf("Using can %s baud %u\n", can_dev, 1000000);
-	}
+    if (use_can) {
+        int error = csp_can_socketcan_open_and_add_interface(can_dev, CSP_IF_CAN_DEFAULT_NAME, 1000000, true, &default_iface);
+        if (error != CSP_ERR_NONE) {
+            csp_log_error("failed to add CAN interface [%s], error: %d", can_dev, error);
+        }
+        printf("Using can %s baud %u\n", can_dev, 1000000);
+    }
 
 	if (csp_route_start_task(0, 0) < 0)
 		return -1;
@@ -363,7 +356,7 @@ int main(int argc, char **argv)
 			printf("UPLOAD IMAGE\n");
 			printf("----------\n");
 
-			char path[100];
+			char path[101];
 			char *subarg = strtok(optarg, ",");
 			int slot = atoi(subarg);
 			subarg = strtok(NULL, ",");
