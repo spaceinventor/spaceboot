@@ -221,7 +221,7 @@ int main(int argc, char **argv)
 {
 	/* Parse Options */
 	int c;
-	while ((c = getopt(argc, argv, "+hlwsb:c:u:n:p:")) != -1) {
+	while ((c = getopt(argc, argv, "+hlwsb:c:u:n:p:v:")) != -1) {
 
 		switch (c) {
 		case 'h':
