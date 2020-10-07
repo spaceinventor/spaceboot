@@ -27,7 +27,7 @@
 param_t * boot_img[4];
 
 /* Parsed values */
-uint8_t addr = 1;
+uint16_t addr = 1;
 char *can_dev = "can0";
 int verify = true;
 char *uart_dev = "/dev/ttyUSB0";
@@ -265,7 +265,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Parse <TARGET> */
-	uint8_t node = atoi(argv[optind]);
+	uint16_t node = atoi(argv[optind]);
 	optind++;
 
 	/* Setup remote parameters */
