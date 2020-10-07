@@ -127,7 +127,7 @@ static void reset_to_flash(int node, int flash, int times) {
 
 	char queue_buf[25];
 	param_queue_t queue;
-	param_queue_init(&queue, queue_buf, 25, 0, PARAM_QUEUE_TYPE_SET);
+	param_queue_init(&queue, queue_buf, 25, 0, PARAM_QUEUE_TYPE_SET, csp_version);
 
 	uint8_t zero = 0;
 	param_queue_add(&queue, boot_img[0], 0, &zero);
