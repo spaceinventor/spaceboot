@@ -21,6 +21,7 @@
 #include <csp/arch/csp_thread.h>
 #include <csp/interfaces/csp_if_can.h>
 #include <csp/interfaces/csp_if_kiss.h>
+#include <csp/interfaces/csp_if_zmqhub.h>
 #include <csp/drivers/usart.h>
 #include <csp/drivers/can_socketcan.h>
 
@@ -36,6 +37,7 @@ int use_uart = 0;
 int use_can = 1;
 int use_slash = 0;
 int csp_version = 2;
+char * csp_zmqhub_addr = NULL;
 
 VMEM_DEFINE_STATIC_RAM(test, "test", 10000);
 
@@ -221,7 +223,7 @@ int main(int argc, char **argv)
 {
 	/* Parse Options */
 	int c;
-	while ((c = getopt(argc, argv, "+hlwsb:c:u:n:p:v:")) != -1) {
+	while ((c = getopt(argc, argv, "+hlwsb:c:u:n:p:v:z:")) != -1) {
 
 		switch (c) {
 		case 'h':
@@ -251,6 +253,10 @@ int main(int argc, char **argv)
 			break;
         case 'v':
             csp_version = atoi(optarg);
+            break;
+        case 'z':
+            csp_zmqhub_addr = optarg;
+            use_can = 0;
             break;
 		default:
 			exit(EXIT_FAILURE);
@@ -286,6 +292,9 @@ int main(int argc, char **argv)
     if (csp_init(&csp_config) < 0)
         return -1;
 
+    csp_debug_set_level(CSP_INFO, 1);
+    csp_debug_set_level(4, 1);
+
     csp_iface_t * default_iface = NULL;
     if (use_uart) {
         csp_usart_conf_t conf = {
@@ -311,6 +320,16 @@ int main(int argc, char **argv)
             csp_log_error("failed to add CAN interface [%s], error: %d", can_dev, error);
         }
         printf("Using can %s baud %u\n", can_dev, 1000000);
+    }
+
+    if (csp_zmqhub_addr) {
+        printf("zmq str %s\n", csp_zmqhub_addr);
+        csp_iface_t * zmq_if;
+        csp_zmqhub_init(csp_get_address(), csp_zmqhub_addr, 0, &zmq_if);
+        zmq_if->name = "ZMQ";
+
+        usleep(500);
+        default_iface = zmq_if;
     }
 
 	if (csp_route_start_task(0, 0) < 0)
