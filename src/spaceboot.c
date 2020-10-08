@@ -127,9 +127,9 @@ static void reset_to_flash(int node, int flash, int times) {
 	printf("  Switching to flash %d\n", flash);
 	printf("  Will run this image %d times\n", times);
 
-	char queue_buf[25];
+	char queue_buf[50];
 	param_queue_t queue;
-	param_queue_init(&queue, queue_buf, 25, 0, PARAM_QUEUE_TYPE_SET, csp_version);
+	param_queue_init(&queue, queue_buf, 50, 0, PARAM_QUEUE_TYPE_SET, csp_version);
 
 	uint8_t zero = 0;
 	param_queue_add(&queue, boot_img[0], 0, &zero);
@@ -280,6 +280,11 @@ int main(int argc, char **argv)
 	boot_img[2] = param_list_create_remote(22, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img2", 10);
 	boot_img[3] = param_list_create_remote(23, node, PARAM_TYPE_UINT8, PM_CONF, 0, "boot_img3", 10);
 
+	param_list_add(boot_img[0]);
+	param_list_add(boot_img[1]);
+	param_list_add(boot_img[2]);
+	param_list_add(boot_img[3]);
+
     csp_conf_t csp_config;
     csp_conf_get_defaults(&csp_config);
     csp_config.version = csp_version;
@@ -292,8 +297,8 @@ int main(int argc, char **argv)
     if (csp_init(&csp_config) < 0)
         return -1;
 
-    csp_debug_set_level(CSP_INFO, 1);
-    csp_debug_set_level(4, 1);
+    //csp_debug_set_level(CSP_INFO, 1);
+    //csp_debug_set_level(4, 1);
 
     csp_iface_t * default_iface = NULL;
     if (use_uart) {
