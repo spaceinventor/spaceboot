@@ -340,7 +340,7 @@ int main(int argc, char **argv)
 	if (csp_route_start_task(0, 0) < 0)
 		return -1;
 
-	csp_rdp_set_opt(4, 5000, 2500, 1, 1000, 4);
+	csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
 
 	printf("Setting default route to %s\n", default_iface->name);
     csp_rtable_set(0, 0, default_iface, CSP_NO_VIA_ADDRESS);
