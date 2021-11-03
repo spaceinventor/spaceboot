@@ -331,7 +331,7 @@ int main(int argc, char **argv)
         csp_zmqhub_init(csp_get_address(), csp_zmqhub_addr, 0, &zmq_if);
         zmq_if->name = "ZMQ";
 
-        usleep(500);
+        sleep(1);
         default_iface = zmq_if;
     }
 
