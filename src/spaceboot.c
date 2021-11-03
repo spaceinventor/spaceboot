@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <endian.h>
 
 #include <param/param.h>
 #include <param/param_list.h>
@@ -16,7 +17,6 @@
 
 #include <csp/csp.h>
 #include <csp/csp_cmp.h>
-#include <csp/csp_endian.h>
 #include <csp/arch/csp_time.h>
 #include <csp/arch/csp_thread.h>
 #include <csp/interfaces/csp_if_can.h>
@@ -92,10 +92,7 @@ static vmem_list_t vmem_list_find(int node, int timeout, char * name, int namele
 	request->type = VMEM_SERVER_LIST;
 	packet->length = sizeof(vmem_request_t);
 
-	if (!csp_send(conn, packet, VMEM_SERVER_TIMEOUT)) {
-		csp_buffer_free(packet);
-		return ret;
-	}
+	csp_send(conn, packet);
 
 	/* Wait for response */
 	packet = csp_read(conn, timeout);
@@ -111,8 +108,8 @@ static vmem_list_t vmem_list_find(int node, int timeout, char * name, int namele
 			ret.vmem_id = vmem->vmem_id;
 			ret.type = vmem->type;
 			memcpy(ret.name, vmem->name, 5);
-			ret.vaddr = csp_ntoh32(vmem->vaddr);
-			ret.size = csp_ntoh32(vmem->size);
+			ret.vaddr = be32toh(vmem->vaddr);
+			ret.size = be32toh(vmem->size);
 		}
 	}
 
@@ -219,6 +216,13 @@ static void upload_and_verify(int node, int address, char * data, int len) {
 	free(datain);
 }
 
+static pthread_t router_handle;
+void * router_task(void * param) {
+	while(1) {
+		csp_route_work();
+	}
+}
+
 int main(int argc, char **argv)
 {
 	/* Parse Options */
@@ -285,17 +289,11 @@ int main(int argc, char **argv)
 	param_list_add(boot_img[2]);
 	param_list_add(boot_img[3]);
 
-    csp_conf_t csp_config;
-    csp_conf_get_defaults(&csp_config);
-    csp_config.version = csp_version;
-    csp_config.buffers = 100;
-    csp_config.buffer_data_size = 2100;
-    csp_config.address = addr;
-    csp_config.hostname = "spaceboot";
-    csp_config.revision = "";
-    csp_config.model = "linux";
-    if (csp_init(&csp_config) < 0)
-        return -1;
+	csp_conf.address = addr;
+	csp_conf.version = csp_version;
+	csp_conf.hostname = "spaceboot";
+	csp_conf.model = "linux";
+	csp_init();
 
     //csp_debug_set_level(CSP_INFO, 1);
     //csp_debug_set_level(4, 1);
@@ -337,8 +335,7 @@ int main(int argc, char **argv)
         default_iface = zmq_if;
     }
 
-	if (csp_route_start_task(0, 0) < 0)
-		return -1;
+	pthread_create(&router_handle, NULL, &router_task, NULL);
 
 	csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
 
