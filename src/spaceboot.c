@@ -47,7 +47,7 @@ static void usage(void)
 	printf("Usage: spaceboot [OPTIONS] <TARGET> [COMMANDS]\n");
 	printf("\n");
 	printf("CAN Bootloader\n");
-	printf("Copyright (c) 2016-2019 Space Inventor <info@satlab.com>\n");
+	printf("Copyright (c) 2016-2022 Space Inventor <info@space-inventor.com>\n");
 	printf("\n");
 	printf(" [OPTIONS]:\n\n");
 	printf("  -c INTERFACE,\tUse INTERFACE as CAN interface\n");
