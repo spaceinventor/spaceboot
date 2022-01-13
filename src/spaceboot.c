@@ -344,8 +344,10 @@ int main(int argc, char **argv)
 
 	csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
 
-	printf("Setting default route to %s\n", default_iface->name);
-    csp_rtable_set(0, 0, default_iface, CSP_NO_VIA_ADDRESS);
+	if (default_iface) {
+		printf("Setting default route to %s\n", default_iface->name);
+    	csp_rtable_set(0, 0, default_iface, CSP_NO_VIA_ADDRESS);
+	}
 
 	/**
 	 * STEP 0: Contact system
