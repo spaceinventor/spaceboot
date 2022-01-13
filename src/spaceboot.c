@@ -18,12 +18,13 @@
 #include <csp/csp.h>
 #include <csp/csp_cmp.h>
 #include <csp/arch/csp_time.h>
-#include <csp/arch/csp_thread.h>
 #include <csp/interfaces/csp_if_can.h>
 #include <csp/interfaces/csp_if_kiss.h>
 #include <csp/interfaces/csp_if_zmqhub.h>
 #include <csp/drivers/usart.h>
 #include <csp/drivers/can_socketcan.h>
+
+#include <pthread.h>
 
 param_t * boot_img[4];
 
@@ -134,7 +135,7 @@ static void reset_to_flash(int node, int flash, int times) {
 	param_queue_add(&queue, boot_img[2], 0, &zero);
 	param_queue_add(&queue, boot_img[3], 0, &zero);
 	param_queue_add(&queue, boot_img[flash], 0, &times);
-	param_push_queue(&queue, 1, node, 100);
+	param_push_queue(&queue, 1, node, 1000);
 
 	printf("  Rebooting");
 	csp_reboot(node);
@@ -143,7 +144,7 @@ static void reset_to_flash(int node, int flash, int times) {
 	while(ms > 0) {
 		printf(".");
 		fflush(stdout);
-		csp_sleep_ms(step);
+		usleep(step * 1000);
 		ms -= step;
 	}
 	printf("\n");
@@ -154,7 +155,7 @@ static void reset_to_flash(int node, int flash, int times) {
 		while(ms > 0) {
 			printf(".");
 			fflush(stdout);
-			csp_sleep_ms(step);
+			usleep(step * 1000);
 			ms -= step;
 		}
 		printf("\n");
@@ -310,7 +311,7 @@ int main(int argc, char **argv)
         };
         int error = csp_usart_open_and_add_kiss_interface(&conf, CSP_IF_KISS_DEFAULT_NAME, &default_iface);
         if (error != CSP_ERR_NONE) {
-            csp_log_error("failed to add KISS interface [%s], error: %d", uart_dev, error);
+            printf("failed to add KISS interface [%s], error: %d", uart_dev, error);
             exit(1);
         }
 
@@ -320,7 +321,7 @@ int main(int argc, char **argv)
     if (use_can) {
         int error = csp_can_socketcan_open_and_add_interface(can_dev, CSP_IF_CAN_DEFAULT_NAME, 1000000, true, &default_iface);
         if (error != CSP_ERR_NONE) {
-            csp_log_error("failed to add CAN interface [%s], error: %d", can_dev, error);
+            printf("failed to add CAN interface [%s], error: %d", can_dev, error);
         }
         printf("Using can %s baud %u\n", can_dev, 1000000);
     }
@@ -330,10 +331,14 @@ int main(int argc, char **argv)
         csp_iface_t * zmq_if;
         csp_zmqhub_init(csp_get_address(), csp_zmqhub_addr, 0, &zmq_if);
         zmq_if->name = "ZMQ";
+		zmq_if->addr = addr;
+		zmq_if->netmask = 8;
 
         sleep(1);
         default_iface = zmq_if;
     }
+
+	csp_iflist_print();
 
 	pthread_create(&router_handle, NULL, &router_task, NULL);
 
