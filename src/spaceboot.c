@@ -296,8 +296,8 @@ int main(int argc, char **argv)
 	csp_conf.model = "linux";
 	csp_init();
 
-    //csp_debug_set_level(CSP_INFO, 1);
-    //csp_debug_set_level(4, 1);
+	//extern uint8_t csp_dbg_packet_print;
+	//csp_dbg_packet_print = 1;
 
     csp_iface_t * default_iface = NULL;
     if (use_uart) {
@@ -335,7 +335,6 @@ int main(int argc, char **argv)
 		zmq_if->netmask = 8;
 
         sleep(1);
-        default_iface = zmq_if;
     }
 
 	csp_iflist_print();
@@ -343,11 +342,6 @@ int main(int argc, char **argv)
 	pthread_create(&router_handle, NULL, &router_task, NULL);
 
 	csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
-
-	if (default_iface) {
-		printf("Setting default route to %s\n", default_iface->name);
-    	csp_rtable_set(0, 0, default_iface, CSP_NO_VIA_ADDRESS);
-	}
 
 	/**
 	 * STEP 0: Contact system
