@@ -298,6 +298,8 @@ int main(int argc, char **argv)
 
 	//extern uint8_t csp_dbg_packet_print;
 	//csp_dbg_packet_print = 1;
+	//extern uint8_t csp_dbg_rdp_print;
+	//csp_dbg_rdp_print = 1;
 
     csp_iface_t * default_iface = NULL;
     if (use_uart) {
@@ -324,6 +326,9 @@ int main(int argc, char **argv)
             printf("failed to add CAN interface [%s], error: %d", can_dev, error);
         }
         printf("Using can %s baud %u\n", can_dev, 1000000);
+		default_iface->name = "CAN";
+		default_iface->addr = addr;
+		default_iface->netmask = 8;
     }
 
     if (csp_zmqhub_addr) {
@@ -341,7 +346,8 @@ int main(int argc, char **argv)
 
 	pthread_create(&router_handle, NULL, &router_task, NULL);
 
-	csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
+	//csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
+	csp_rdp_set_opt(6, 10000, 1000, 1, 1000, 5);
 
 	/**
 	 * STEP 0: Contact system
