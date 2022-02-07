@@ -38,6 +38,7 @@ int use_uart = 0;
 int use_can = 1;
 int use_slash = 0;
 int csp_version = 2;
+int type = 0;
 char * csp_zmqhub_addr = NULL;
 
 VMEM_DEFINE_STATIC_RAM(test, "test", 10000);
@@ -132,8 +133,10 @@ static void reset_to_flash(int node, int flash, int times) {
 	uint8_t zero = 0;
 	param_queue_add(&queue, boot_img[0], 0, &zero);
 	param_queue_add(&queue, boot_img[1], 0, &zero);
-	param_queue_add(&queue, boot_img[2], 0, &zero);
-	param_queue_add(&queue, boot_img[3], 0, &zero);
+	if (type == 1) {
+		param_queue_add(&queue, boot_img[2], 0, &zero);
+		param_queue_add(&queue, boot_img[3], 0, &zero);
+	}
 	param_queue_add(&queue, boot_img[flash], 0, &times);
 	param_push_queue(&queue, 1, node, 1000);
 
@@ -228,7 +231,7 @@ int main(int argc, char **argv)
 {
 	/* Parse Options */
 	int c;
-	while ((c = getopt(argc, argv, "+hlwsb:c:u:n:p:v:z:")) != -1) {
+	while ((c = getopt(argc, argv, "+hlwsb:c:u:t:n:p:v:z:")) != -1) {
 
 		switch (c) {
 		case 'h':
@@ -250,6 +253,8 @@ int main(int argc, char **argv)
 			use_can = 0;
 			uart_dev = optarg;
 			break;
+		case 't':
+			type = atoi(optarg);
 		case 'b':
 			uart_baud = atoi(optarg);
 			break;
@@ -346,8 +351,8 @@ int main(int argc, char **argv)
 
 	pthread_create(&router_handle, NULL, &router_task, NULL);
 
-	//csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
-	csp_rdp_set_opt(6, 10000, 1000, 1, 1000, 5);
+	csp_rdp_set_opt(3, 10000, 500, 1, 2000, 2);
+	//csp_rdp_set_opt(6, 10000, 1000, 1, 1000, 5);
 
 	/**
 	 * STEP 0: Contact system

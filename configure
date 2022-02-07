@@ -1,4 +1,4 @@
 #!/bin/sh
 rm -r builddir
 
-meson . builddir
+meson . builddir -Dprefix=$HOME/.local
